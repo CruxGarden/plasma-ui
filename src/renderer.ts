@@ -186,10 +186,6 @@ export class PlasmaRenderer {
   private time = 0;
   private dpr = 1;
   private resizeQueued = false;
-  /** Touch devices only: momentum scrolling is the case this exists for. */
-  private coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-  private scrolling = false;
-  private scrollIdle: ReturnType<typeof setTimeout> | undefined;
   private energy = 0;
   private mouse = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
   private pulses: number[][] = Array.from({ length: MAX_PULSES }, () => [0, 0, -99, 0]);
@@ -242,7 +238,6 @@ export class PlasmaRenderer {
     this.mouse.x = this.mouse.tx = innerWidth / 2;
     this.mouse.y = this.mouse.ty = innerHeight / 2;
     addEventListener("resize", this.resize);
-    if (this.coarse) addEventListener("scroll", this.onScroll, { passive: true });
     addEventListener("pointermove", this.onPointer, { passive: true });
     document.addEventListener("pointerleave", this.onLeave);
     this.applyResize();
@@ -374,26 +369,12 @@ export class PlasmaRenderer {
   destroy() {
     cancelAnimationFrame(this.raf);
     removeEventListener("resize", this.resize);
-    removeEventListener("scroll", this.onScroll);
-    clearTimeout(this.scrollIdle);
     removeEventListener("pointermove", this.onPointer);
     document.removeEventListener("pointerleave", this.onLeave);
     this.recs.forEach(r => { r.el.style.translate = ""; r.el.style.scale = ""; });
     this.recs.clear();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
-
-  /**
-   * A fling on iOS is driven by the compositor, and rAF is deferred while it
-   * runs - so anything recomputed per frame arrives late and the plasma visibly
-   * trails the content it belongs to. Holding the material still through the
-   * scroll is better than animating it a few frames behind.
-   */
-  private onScroll = () => {
-    this.scrolling = true;
-    clearTimeout(this.scrollIdle);
-    this.scrollIdle = setTimeout(() => { this.scrolling = false; }, 400);
-  };
 
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
   private onLeave = () => { this.mouse.target = 0; };
@@ -457,11 +438,7 @@ export class PlasmaRenderer {
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0.016;
     this.last = now;
     const s = this.settings;
-    // A fling stops the field's own drift, and nothing else. The springs work
-    // in page coordinates, so scrolling never disturbed them - snapping them
-    // here only made the geometry jump each time the flag flipped, which is
-    // what flickered. Reduced motion still slows the field to 40%.
-    this.time += dt * (this.coarse && this.scrolling ? 0 : s.reducedMotion ? 0.4 : 1);
+    this.time += dt * (s.reducedMotion ? 0.4 : 1);
 
     // ease shared state
     const m = this.mouse;
