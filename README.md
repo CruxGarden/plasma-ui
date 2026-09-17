@@ -6,7 +6,7 @@ Liquid panels for React. Every `<Plasma>` panel joins one shared plasma: surface
 
 [**Try it**](https://cruxgarden.github.io/plasma-ui/) · [workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/)
 
-**Status: 0.1.0.** The core material is stable and tested; the API may change between minor versions before 1.0.
+**Status: 0.2.0.** The core material is stable and tested; the API may change between minor versions before 1.0.
 
 ```bash
 npm install @cruxgarden/plasma-ui
