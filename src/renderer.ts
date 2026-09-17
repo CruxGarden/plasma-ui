@@ -78,8 +78,12 @@ interface Rec extends ShapeOptions {
   el: HTMLElement;
   form: number; formV: number; removing: boolean;
   lx: number; ly: number;
-  /** Last translate written, so an unchanged frame writes nothing. */
+  /** Last translate and scale written, so an unchanged frame writes nothing. */
   leanCss: string;
+  scaleCss: string;
+  /** This frame's values, applied only after every layout read is done. */
+  wantLean: string;
+  wantScale: string;
   joined: boolean; dragging: boolean;
   layoutBox: (() => Box) | null;
   pulseAt: number; pulseS: number;
@@ -312,7 +316,7 @@ export class PlasmaRenderer {
     const id = this.nextId++;
     const rec: Rec = {
       id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false,
-      lx: 0, ly: 0, leanCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
+      lx: 0, ly: 0, leanCss: "", scaleCss: "", wantLean: "", wantScale: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
     this.recs.set(id, rec);
@@ -497,14 +501,14 @@ export class PlasmaRenderer {
       // getBoundingClientRect below then forced a reflow to resolve it.
       // Below a twentieth of a pixel there is nothing to see, so settle.
       if (Math.abs(tx - r.lx) < 0.05 && Math.abs(ty - r.ly) < 0.05) { r.lx = tx; r.ly = ty; }
-      const lean = tx === 0 && ty === 0 && r.lx === 0 && r.ly === 0
+      r.wantLean = tx === 0 && ty === 0 && r.lx === 0 && r.ly === 0
         ? ""
         : `${r.lx.toFixed(2)}px ${r.ly.toFixed(2)}px`;
-      if (lean !== r.leanCss) { r.leanCss = lean; r.el.style.translate = lean; }
 
       const u = (this.time - r.pulseAt) / 0.36;
-      if (r.pulseAt >= 0 && u >= 0 && u <= 1 && !s.reducedMotion) r.el.style.scale = String(1 + 0.04 * r.pulseS * Math.sin(Math.PI * u));
-      else if (r.el.style.scale) r.el.style.scale = "";
+      r.wantScale = r.pulseAt >= 0 && u >= 0 && u <= 1 && !s.reducedMotion
+        ? String(1 + 0.04 * r.pulseS * Math.sin(Math.PI * u))
+        : "";
     });
 
     // Viscous surface: each plasma box is a spring that chases its element (in page
@@ -540,6 +544,16 @@ export class PlasmaRenderer {
       const l = Math.min(tgt[0], sp.e[0]) - sx, t = Math.min(tgt[1], sp.e[1]) - sy;
       const rgt = Math.max(tgt[2], sp.e[2]) - sx, btm = Math.max(tgt[3], sp.e[3]) - sy;
       r.drawn = { l, t, w: rgt - l, h: btm - t };
+    });
+
+    // Every layout read for this frame is done, so the writes land here. Doing
+    // them before the read above forced a synchronous layout each frame, which
+    // is what a compositor-driven scroll on iOS cannot absorb: the motion was
+    // smooth but scrolling stuttered. Lean and pulse both ease over hundreds of
+    // milliseconds, so taking effect a frame later is not visible.
+    list.forEach(r => {
+      if (r.wantLean !== r.leanCss) { r.leanCss = r.wantLean; r.el.style.translate = r.wantLean; }
+      if (r.wantScale !== r.scaleCss) { r.scaleCss = r.wantScale; r.el.style.scale = r.wantScale; }
     });
 
     this.draw(list.slice(0, this.max));
