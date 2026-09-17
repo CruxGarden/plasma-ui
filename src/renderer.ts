@@ -238,6 +238,7 @@ export class PlasmaRenderer {
     this.mouse.x = this.mouse.tx = innerWidth / 2;
     this.mouse.y = this.mouse.ty = innerHeight / 2;
     addEventListener("resize", this.resize);
+    document.addEventListener("visibilitychange", this.onVisibility);
     addEventListener("pointermove", this.onPointer, { passive: true });
     document.addEventListener("pointerleave", this.onLeave);
     this.applyResize();
@@ -346,7 +347,10 @@ export class PlasmaRenderer {
 
   private layoutBoxOf(r: Rec): Box {
     if (r.layoutBox) return r.layoutBox();
-    const b = elementBox(r.el);
+    // The frame already read this element's rect a moment ago, with no style
+    // write in between, so that box is exact - reading it again cost a second
+    // getBoundingClientRect per panel per frame for the same numbers.
+    const b = r.box ?? elementBox(r.el);
     return { l: b.l - r.lx, t: b.t - r.ly, w: b.w, h: b.h };
   }
 
@@ -369,12 +373,24 @@ export class PlasmaRenderer {
   destroy() {
     cancelAnimationFrame(this.raf);
     removeEventListener("resize", this.resize);
+    document.removeEventListener("visibilitychange", this.onVisibility);
     removeEventListener("pointermove", this.onPointer);
     document.removeEventListener("pointerleave", this.onLeave);
     this.recs.forEach(r => { r.el.style.translate = ""; r.el.style.scale = ""; });
     this.recs.clear();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
+
+  /**
+   * A hidden tab draws nothing anyone can see. Browsers throttle rAF there
+   * but do not all stop it, so the loop stops itself and picks up where it
+   * left off - `last` is reset so the first frame back does not see a
+   * minute-long dt.
+   */
+  private onVisibility = () => {
+    if (document.hidden) { cancelAnimationFrame(this.raf); this.raf = 0; }
+    else if (!this.raf) { this.last = 0; this.raf = requestAnimationFrame(this.frame); }
+  };
 
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
   private onLeave = () => { this.mouse.target = 0; };
@@ -408,16 +424,20 @@ export class PlasmaRenderer {
     this.canvas.height = ch;
     const w = Math.max(1, Math.round(this.canvas.width * MASK_SCALE));
     const h = Math.max(1, Math.round(this.canvas.height * MASK_SCALE));
-    const size = (t: Target, tw: number, th: number) => {
+    const size = (t: Target, tw: number, th: number, color = false) => {
       t.w = tw; t.h = th;
       gl.bindTexture(gl.TEXTURE_2D, t.tex);
-      if (this.floatOK) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, tw, th, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      // Field and height targets carry signed distances and blur weights and
+      // want the half-float precision. A colour target is only ever shown, and
+      // the screen is 8-bit: at full resolution that halves the largest
+      // allocation here.
+      if (this.floatOK && !color) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, tw, th, 0, gl.RGBA, gl.HALF_FLOAT, null);
       else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.tex, 0);
     };
     [this.rtA, this.rtB, this.rtC, this.rtT, this.rtFr, this.rtBgM, this.rtBgH].forEach(t => size(t, w, h));
-    size(this.rtBg, this.canvas.width, this.canvas.height);
+    size(this.rtBg, this.canvas.width, this.canvas.height, true);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.mrtFb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.rtT.tex, 0);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, this.rtFr.tex, 0);
@@ -637,15 +657,26 @@ export class PlasmaRenderer {
     gl.useProgram(bl.pr);
     gl.uniform1i(bl.u.uTex, 0);
     gl.activeTexture(gl.TEXTURE0);
-    if (list.some((_, i) => this.FR[i] > 0.002)) {
-      pass(this.rtBg, this.rtBgM, 1.5 * k, 0); pass(this.rtBgM, this.rtB, 0, 2.5 * k);
-      pass(this.rtB, this.rtBgM, 2.5 * k, 0); pass(this.rtBgM, this.rtB, 0, 2.5 * k);
-      pass(this.rtB, this.rtBgM, 2.5 * k, 0); pass(this.rtBgM, this.rtB, 0, 2.5 * k);
-      pass(this.rtB, this.rtBgM, 0, 0);
+    // Which chains have anything to blur. Frost and elevation share a target
+    // (frost in .r, elevation in .g), so that chain runs if either is set.
+    const n = list.length;
+    let hasFrost = false, hasTint = false, hasElev = false;
+    for (let i = 0; i < n; i++) {
+      if (this.FR[i] > 0.002) hasFrost = true;
+      if (this.T[i * 4 + 3] > 0.002) hasTint = true;
+      if (this.EL[i] > 0.002) hasElev = true;
+    }
+    if (hasFrost) {
+      // Ping-pong arranged so the sixth pass lands in rtBgM; this used to end
+      // in the scratch target and spend a seventh pass copying it across.
+      pass(this.rtBg, this.rtB, 1.5 * k, 0); pass(this.rtB, this.rtBgM, 0, 2.5 * k);
+      pass(this.rtBgM, this.rtB, 2.5 * k, 0); pass(this.rtB, this.rtBgM, 0, 2.5 * k);
+      pass(this.rtBgM, this.rtB, 2.5 * k, 0); pass(this.rtB, this.rtBgM, 0, 2.5 * k);
       pass(this.rtBgM, this.rtB, 5 * k, 0); pass(this.rtB, this.rtBgH, 0, 5 * k);
       pass(this.rtBgH, this.rtB, 5 * k, 0); pass(this.rtB, this.rtBgH, 0, 5 * k);
       pass(this.rtBgH, this.rtB, 5 * k, 0); pass(this.rtB, this.rtBgH, 0, 5 * k);
     }
+
 
     // 1. silhouette
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.rtA.fb);
@@ -660,16 +691,19 @@ export class PlasmaRenderer {
     setCommon(this.progs.tint.u, this.dpr * MASK_SCALE);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    // 2. outline field (rtA), tint and frost (same blur), and height field (rtC)
+    // 2. outline field (rtA), tint and frost (same blur), and height field (rtC).
+    // A chain whose input is all zero is skipped: blurring zeros gives zeros,
+    // and the composite reads the tint through its alpha, so an unblurred
+    // colour under a zero alpha is invisible.
     gl.useProgram(bl.pr);
     gl.uniform1i(bl.u.uTex, 0);
     gl.activeTexture(gl.TEXTURE0);
     const so = 1.4 * k * s.smoothness;
-    for (let n = 0; n < 3; n++) { pass(this.rtA, this.rtB, so, 0); pass(this.rtB, this.rtA, 0, so); }
-    for (let n = 0; n < 3; n++) { pass(this.rtT, this.rtB, so, 0); pass(this.rtB, this.rtT, 0, so); }
-    for (let n = 0; n < 3; n++) { pass(this.rtFr, this.rtB, so, 0); pass(this.rtB, this.rtFr, 0, so); }
+    for (let i = 0; i < 3; i++) { pass(this.rtA, this.rtB, so, 0); pass(this.rtB, this.rtA, 0, so); }
+    if (hasTint) for (let i = 0; i < 3; i++) { pass(this.rtT, this.rtB, so, 0); pass(this.rtB, this.rtT, 0, so); }
+    if (hasFrost || hasElev) for (let i = 0; i < 3; i++) { pass(this.rtFr, this.rtB, so, 0); pass(this.rtB, this.rtFr, 0, so); }
     pass(this.rtA, this.rtB, 2 * k, 0); pass(this.rtB, this.rtC, 0, 2 * k);
-    for (let n = 0; n < 3; n++) { pass(this.rtC, this.rtB, 2 * k, 0); pass(this.rtB, this.rtC, 0, 2 * k); }
+    for (let i = 0; i < 3; i++) { pass(this.rtC, this.rtB, 2 * k, 0); pass(this.rtB, this.rtC, 0, 2 * k); }
 
     // 3. composite
     const c = this.progs.comp;
@@ -701,7 +735,13 @@ export class PlasmaRenderer {
     gl.activeTexture(gl.TEXTURE0);
   }
 
+  private rgbCache = new Map<string, [number, number, number]>();
   private rgb(hex: string): [number, number, number] {
+    let v = this.rgbCache.get(hex);
+    if (!v) { v = this.rgbParse(hex); this.rgbCache.set(hex, v); }
+    return v;
+  }
+  private rgbParse(hex: string): [number, number, number] {
     let c = this.tintCache.get(hex);
     if (!c) { c = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex) ? hexToRgb(hex) : [1, 1, 1]; this.tintCache.set(hex, c); }
     return c;
