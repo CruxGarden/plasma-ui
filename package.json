@@ -1,7 +1,7 @@
 {
   "name": "@cruxgarden/plasma-ui",
   "version": "0.1.2",
-  "description": "A liquid glass workspace for React: panels share one WebGL material - they fuse on contact, refract, and snap to a grid.",
+  "description": "Liquid panels for React: every panel is one shared plasma - they fuse on contact, refract, and snap to a grid.",
   "main": "dist/index.js",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --format=esm --jsx=automatic --target=es2020 --external:react --external:react-dom --outfile=dist/index.js && tsc",
@@ -53,7 +53,7 @@
     "cruxgarden",
     "react",
     "webgl",
-    "glass",
+    "panels",
     "ui",
     "animation"
   ],

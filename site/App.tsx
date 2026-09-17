@@ -20,7 +20,7 @@ const DEFAULTS: Settings = {
 const PANEL_W = 216, PANEL_H = 144;
 // Full configurations shown in the nav: one look per use case.
 const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
-  { name: "Lumen", blurb: "Clear glass, iridescent rim. The default look.",
+  { name: "Lumen", blurb: "Clear plasma, iridescent rim. The default look.",
     patch: { mood: "tidal", tint: "#ffffff", opacity: 0, frost: 0, panelColors: false,
       rimStyle: "iridescent", rimHex: "#9ff3e4", rim: 1, rimWidth: 1, highlight: 1, edgeLine: 1,
       viscosity: 0.5, stretch: 1, flow: 0, blend: 40, refraction: 1, dispersion: 1, smoothness: 1, elevation: 0.35, ambientDrops: false } },
@@ -130,7 +130,7 @@ function Hero() {
         <Plasma className="hero-title" radius={36}>
           <h1>Plasma UI</h1>
           <p className="lede">
-            Liquid glass panels for React. The panels share one material, and fuse on contact,
+            Liquid panels for React. Every panel is one shared plasma: they fuse on contact,
             refract what's behind them, and snap to a grid.
           </p>
           <div className="row">
@@ -182,8 +182,8 @@ function Playground({ s, set, reset }: { s: Settings; set: <K extends keyof Sett
       .map(k => typeof s[k] === "string" ? `${k}="${s[k]}"` : `${k}={${s[k]}}`);
     const theme = s.theme !== "auto" ? [`theme="${s.theme}"`] : [];
     if (s.rimStyle !== "iridescent") theme.push(`rimColor="${rimColorOf(s)}"`);
-    const glassProps = s.panelColors ? ` tint="${PANEL_COLORS[0]}" opacity={${Math.max(s.opacity, 0.35)}}` : "";
-    return `<PlasmaProvider ${[...props, ...theme].join(" ")}>\n  <Plasma draggable bounds={stageRef}${glassProps}>\n    <h3>Inbox</h3>\n  </Plasma>\n</PlasmaProvider>`;
+    const panelProps = s.panelColors ? ` tint="${PANEL_COLORS[0]}" opacity={${Math.max(s.opacity, 0.35)}}` : "";
+    return `<PlasmaProvider ${[...props, ...theme].join(" ")}>\n  <Plasma draggable bounds={stageRef}${panelProps}>\n    <h3>Inbox</h3>\n  </Plasma>\n</PlasmaProvider>`;
   }, [s]);
 
   const joinedCount = joined.slice(0, count).filter(Boolean).length;
@@ -192,7 +192,7 @@ function Playground({ s, set, reset }: { s: Settings; set: <K extends keyof Sett
     <section id="playground">
       <h2>Playground</h2>
       <p className="section-lede">
-        Drag panels; they fuse on contact and snap to the grid on release. Throw one to stretch the glass.
+        Drag panels; they fuse on contact and snap to the grid on release. Throw one to stretch the plasma.
         Click empty space to send a pulse. The controls change the whole page.
       </p>
       <div className="play">
@@ -327,7 +327,7 @@ function Api() {
           ["blend", "number", "mood", "Distance (px) at which surfaces fuse."],
           ["smoothness", "number", "1", "Outline smoothing."],
           ["viscosity", "number", "0.5", "0 watery and bouncy, 1 thick and slow. Also scales drag and snap springs."],
-          ["stretch", "number", "1", "How far glass trails behind moving panels. 0 = off."],
+          ["stretch", "number", "1", "How far the plasma trails behind moving panels. 0 = off."],
           ["flow", "number", "0", "Slow ripple along the edges."],
           ["tint", "string", `"#ffffff"`, "Plasma color (hex)."],
           ["opacity", "number", "0", "Tint strength: 0 clear, 1 solid."],
@@ -411,9 +411,9 @@ export function Workspace({ panels }) {
 
 const LIMITS = [
   { title: "No layers", body: "Overlapping surfaces fuse. Dialogs, menus, and fixed bars go in plain CSS for now - this page's nav is the pattern." },
-  { title: "No scroll clipping", body: "Glass inside a scrollable container draws past its edges. Scrolling inside one panel is fine." },
+  { title: "No scroll clipping", body: "Plasma inside a scrollable container draws past its edges. Scrolling inside one panel is fine." },
   { title: "No drag or resize handles", body: "draggable moves the whole surface; mark interactive children data-plasma-nodrag." },
-  { title: "Draws its own background", body: "The glass refracts its background layer - the mood field, or any color, image, canvas, or video you pass - not your live DOM. Custom background shaders aren't supported yet." },
+  { title: "Draws its own background", body: "The plasma refracts its background layer - the mood field, or any color, image, canvas, or video you pass - not your live DOM. Custom background shaders aren't supported yet." },
   { title: "Rounded rectangles only", body: "No rotation or arbitrary shapes. Up to maxSurfaces (default 16) render at once." },
 ];
 
@@ -479,7 +479,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 // Content plate inside each card: lighter in light mode, darker in dark mode,
-// and mixed with the surface's tint - the pattern a real app would use for readable content on glass.
+// and mixed with the surface's tint - the pattern a real app would use for readable content on plasma.
 function plateStyle(tint: string, opacity: number): React.CSSProperties {
   const amt = Math.round(Math.min(Math.max(opacity, 0), 1) * 40);
   return { background: `color-mix(in srgb, ${tint} ${amt}%, var(--plate))` };

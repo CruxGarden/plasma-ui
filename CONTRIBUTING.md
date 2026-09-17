@@ -28,7 +28,7 @@ Read `AGENTS.md` first - it covers the render pipeline, motion systems, and inva
 
 ## Known gaps (good first projects)
 
-- Layers: overlapping surfaces currently fuse; fixed bars over scrolling glass must be plain CSS.
-- Clipping for glass inside scroll containers.
+- Layers: overlapping surfaces currently fuse; fixed bars over scrolling plasma must be plain CSS.
+- Clipping for plasma inside scroll containers.
 - Drag handles (`handle` prop) so panel content stays fully interactive.
 - Resize handles with grid snapping.

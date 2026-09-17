@@ -5,7 +5,7 @@ import { PlasmaProvider, Plasma, usePlasma, MoodName, Offset } from "../../src";
  * Workspace - a real-world example app built on Plasma UI.
  * Everything on screen is a <Plasma> surface: the top bar, the dock, and four
  * working panels. The app fills the viewport (no page scroll), which is the
- * layout where an all-glass shell works today.
+ * layout where an all-panel shell works today.
  *
  * Shown here:
  *  - draggable panels with edge/grid snapping and join-aware padding

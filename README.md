@@ -1,6 +1,6 @@
 # Plasma UI
 
-A liquid glass workspace for React. Every `<Plasma>` panel joins one WebGL material: surfaces fuse on contact, refract what's behind them, and snap to a grid when dragged. Built for workspace and canvas UIs - tool panels, dashboards, launchers - by [Crux Garden](https://github.com/cruxgarden).
+Liquid panels for React. Every `<Plasma>` panel joins one shared plasma: surfaces fuse on contact, refract what's behind them, and snap to a grid when dragged. Built for workspace and canvas UIs - tool panels, dashboards, launchers - by [Crux Garden](https://github.com/cruxgarden).
 
 ![Dragging a panel: it tears off its group, travels as liquid, fuses with another panel, and snaps to the grid](docs/demo.gif)
 
@@ -42,7 +42,7 @@ Plasma UI 0.1 is a workspace library, not a full UI system. Know these before ad
 - **No layers.** Overlapping surfaces fuse. Dialogs, menus, toasts, and fixed bars must be plain CSS for now (the docs site's own nav shows the pattern).
 - **No clipping in scroll containers.** Plasma inside a scrollable list draws past its edges. Scrolling _inside_ one panel is fine.
 - **No drag or resize handles.** `draggable` moves the whole surface; mark interactive children `data-plasma-nodrag`.
-- **Draws its own background.** Browsers don't let WebGL read the rendered page, so the glass refracts its background layer - the procedural mood field, or any color, image, canvas, or video you pass via `background` - rather than your live DOM. Custom background shaders aren't supported yet.
+- **Draws its own background.** Browsers don't let WebGL read the rendered page, so the plasma refracts its background layer - the procedural mood field, or any color, image, canvas, or video you pass via `background` - rather than your live DOM. Custom background shaders aren't supported yet.
 - **Rounded rectangles only.** No rotation or arbitrary shapes.
 
 All of these are on the roadmap below.
@@ -54,7 +54,7 @@ Markup stays ordinary HTML. `PlasmaProvider` renders one fixed canvas behind the
 1. **Silhouette.** Every registered element reports its box; one shader draws them as a single shape. Corners against a neighbor square off, and blending applies only where surfaces face different ways, so flush panels share a clean outline while gaps and steps get rounded fillets.
 2. **Smoothing.** The silhouette is blurred and traced at its halfway contour, evening out curvature.
 3. **Height.** A heavier blur becomes a height map; its slope drives refraction, so joined panels act as one lens.
-4. **Tint and frost.** Color and translucency spread across the material with the same blur, so different values flow into each other across joins. The background renders once to a texture; two blurred copies serve frosted glass.
+4. **Tint and frost.** Color and translucency spread across the material with the same blur, so different values flow into each other across joins. The background renders once to a texture; two blurred copies serve the frosted plasma.
 5. **Light.** The final pass refracts the background, splits color at the edges, and adds a rim and a pointer highlight.
 
 Without WebGL2, `Plasma` falls back to a CSS frosted panel.
@@ -69,7 +69,7 @@ Without WebGL2, `Plasma` falls back to a CSS frosted panel.
 | `background`               | `BackgroundSource`                       |                | Any CSS color (luminance drift), image URL (refracted, slow swirl), or an `img`/`canvas`/`video` element - canvas and video update live. Dynamic. Omit for the procedural mood field |
 | `blend`                    | `number`                                 | mood           | Distance (px) at which surfaces start to fuse                                                                                                                                        |
 | `viscosity`                | `number`                                 | `0.5`          | `0` is watery and bouncy, `1` is slow like syrup; also scales drag and snap springs                                                                                                  |
-| `stretch`                  | `number`                                 | `1`            | How far the glass trails behind moving panels; `0` turns it off                                                                                                                      |
+| `stretch`                  | `number`                                 | `1`            | How far the plasma trails behind moving panels; `0` turns it off                                                                                                                     |
 | `flow`                     | `number`                                 | `0`            | Slow ripple along the edges                                                                                                                                                          |
 | `tint`                     | `string`                                 | `"#ffffff"`    | Plasma color (hex)                                                                                                                                                                   |
 | `opacity`                  | `number`                                 | `0`            | Tint strength, 0 (clear) to 1 (solid color)                                                                                                                                          |
@@ -128,12 +128,12 @@ const dusk: Mood = {
 
 ## Motion feel
 
-Each surface is a spring chasing its element, and the drawn glass always covers the element. Moving panels leave a trailing stretch; stopping ones overshoot before settling. Scrolling doesn't count as motion.
+Each surface is a spring chasing its element, and the drawn plasma always covers the element. Moving panels leave a trailing stretch; stopping ones overshoot before settling. Scrolling doesn't count as motion.
 
 ```tsx
 <PlasmaProvider viscosity={0.1} stretch={1.3} flow={0.6} />  // water
 <PlasmaProvider viscosity={0.85} stretch={1.8} />             // honey
-<PlasmaProvider stretch={0} />                                // glass tracks panels exactly
+<PlasmaProvider stretch={0} />                                // the plasma tracks panels exactly
 ```
 
 `flow` ripples the outline, so leave it at `0` where flush edges should stay perfectly straight.
@@ -149,13 +149,13 @@ Each surface is a spring chasing its element, and the drawn glass always covers 
   <Plasma tint="#ff5fa2" opacity={0.3} />
 </PlasmaProvider>
 
-// plain glass: no colored rim, just the edge line
+// plain plasma: no colored rim, just the edge line
 <PlasmaProvider rim={0} />
 ```
 
 ## Guidelines
 
-- Use glass for containers: panels, docks, cards, dialogs. Small controls read better as regular HTML on top.
+- Use plasma for containers: panels, docks, cards, dialogs. Small controls read better as regular HTML on top.
 - Place surfaces either flush (they become one piece) or further apart than the blend distance. Smaller gaps render as liquid bridging.
 - Up to `maxSurfaces` (default 16) draw at once; offscreen ones are skipped first. Two render passes loop over every slot per pixel, so raise it only as far as you need.
 - Lean and pulses use the CSS `translate` and `scale` properties, and drag uses `transform`, so they compose with each other. Avoid setting those on `Plasma` elements yourself.
@@ -165,9 +165,9 @@ Each surface is a spring chasing its element, and the drawn glass always covers 
 
 In priority order. Not a schedule.
 
-1. **Layers** - independent materials that stack instead of fusing, for dialogs, menus, and fixed chrome over glass.
+1. **Layers** - independent materials that stack instead of fusing, for dialogs, menus, and fixed chrome over plasma.
 2. **Drag handles and resize** - `handle` prop so panel content stays fully interactive; edge resize with grid snapping.
-3. **Scroll clipping** - glass confined to scrollable containers.
+3. **Scroll clipping** - plasma confined to scrollable containers.
 4. **Pluggable backgrounds** - colors, images, and live canvas/video shipped in 0.1 (`background` prop); custom shaders next.
 5. **Shapes** - rotation and non-rectangular outlines.
 
@@ -225,7 +225,7 @@ Plasma UI is built on well-known graphics and simulation techniques:
 - **Blobby surfaces / metaballs** - the fuse-on-contact behavior descends from Jim Blinn's [_A Generalization of Algebraic Surface Drawing_](https://dl.acm.org/doi/10.1145/357306.357310) (1982).
 - **Signed distance fields** - the material is drawn with 2D SDFs combined by smooth minimum, per Inigo Quilez's [2D distance functions](https://iquilezles.org/articles/distfunctions2d/) and [smooth minimum](https://iquilezles.org/articles/smin/) articles; the procedural background uses his [fBM](https://iquilezles.org/articles/fbm/) construction.
 - **Spring integration** - panel motion uses semi-implicit Euler with fixed substeps, in the spirit of Glenn Fiedler's [_Integration Basics_](https://gafferongames.com/post/integration_basics/).
-- **Liquid glass** - the optical treatment (refraction, dispersion, frost) is an original WebGL take on the direction popularized by Apple's [Liquid Glass](https://developer.apple.com/design/human-interface-guidelines/materials) material.
+- **The optical treatment** (refraction, dispersion, frost) is an original WebGL take on the direction popularized by Apple's [Liquid Glass](https://developer.apple.com/design/human-interface-guidelines/materials) material.
 
 ## License
 

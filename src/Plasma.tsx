@@ -213,7 +213,7 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
     settle({ x: dest.current.x + d[0], y: dest.current.y + d[1] });
   };
 
-  const classes = ["plasma-glass", plasma.supported ? "" : "plasma-fallback", className].filter(Boolean).join(" ");
+  const classes = ["plasma-panel", plasma.supported ? "" : "plasma-fallback", className].filter(Boolean).join(" ");
 
   return (
     <Comp

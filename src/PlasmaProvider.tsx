@@ -26,7 +26,7 @@ export interface PlasmaProviderProps {
   edgeLine?: number;
   /** How thick the material feels: 0 is watery and bouncy, 1 is slow like syrup. Also scales drag and snap springs. Default 0.5. */
   viscosity?: number;
-  /** How far the glass trails and stretches behind moving panels. 0 turns it off. Default 1. */
+  /** How far the plasma trails and stretches behind moving panels. 0 turns it off. Default 1. */
   stretch?: number;
   /** Slow ripple along the edges. Default 0 (still edges). */
   flow?: number;
@@ -36,9 +36,9 @@ export interface PlasmaProviderProps {
   radius?: number;
   /** Plasma tint color (hex). Default "#ffffff". */
   tint?: string;
-  /** Tint strength from 0 (clear glass) to 1 (solid color). Default 0. */
+  /** Tint strength from 0 (clear) to 1 (solid color). Default 0. */
   opacity?: number;
-  /** Translucency from 0 (clear glass) to 1 (frosted). Default 0. */
+  /** Translucency from 0 (clear) to 1 (frosted). Default 0. */
   frost?: number;
   /** How high surfaces float: 0 sits flat with no shadow, 1 floats high with a deep soft shadow. Dragged surfaces raise automatically. Default 0.35. */
   elevation?: number;
@@ -48,13 +48,13 @@ export interface PlasmaProviderProps {
   pointerDrop?: boolean;
   /** Decorative drops orbiting near the bottom right. Default false. */
   ambientDrops?: boolean;
-  /** Grid cell size used when draggable glass snaps. Default 24. */
+  /** Grid cell size used when a draggable panel snaps. Default 24. */
   grid?: number;
   /** Edge latch distance for snapping. Default 40. */
   magnet?: number;
   /** Maximum device pixel ratio for the canvas. Default 1.25. */
   quality?: number;
-  /** Maximum visible glass surfaces. Compiled into the shaders, so it is fixed for the provider's lifetime; more surfaces cost GPU time. Default 16. */
+  /** Maximum visible plasma surfaces. Compiled into the shaders, so it is fixed for the provider's lifetime; more surfaces cost GPU time. Default 16. */
   maxSurfaces?: number;
   /** z-index of the fixed canvas. Default -1 (behind content). */
   zIndex?: number;
@@ -68,7 +68,7 @@ export interface PlasmaContextValue {
   frost: number;
   /** Provider-level default corner radius. */
   radius: number;
-  /** False when WebGL2 is unavailable; <Plasma> falls back to CSS glass. */
+  /** False when WebGL2 is unavailable; <Plasma> falls back to a CSS frosted panel. */
   supported: boolean;
   grid: number;
   magnet: number;
@@ -87,15 +87,15 @@ const PlasmaContext = createContext<PlasmaContextValue>({
 export const usePlasma = () => useContext(PlasmaContext);
 
 const FALLBACK_CSS = `
-.plasma-glass{box-sizing:border-box}
+.plasma-panel{box-sizing:border-box}
 .plasma-fallback{
   background:linear-gradient(160deg,rgb(255 255 255/.14),rgb(255 255 255/.05));
   -webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
   border:1px solid rgb(255 255 255/.22);
   box-shadow:inset 0 1px 0 rgb(255 255 255/.25),0 20px 40px -20px rgb(0 0 0/.5);
 }
-.plasma-glass[data-plasma-draggable]{touch-action:none;cursor:grab}
-.plasma-glass[data-plasma-dragging]{cursor:grabbing;user-select:none}
+.plasma-panel[data-plasma-draggable]{touch-action:none;cursor:grab}
+.plasma-panel[data-plasma-dragging]{cursor:grabbing;user-select:none}
 `;
 
 function useReducedMotion() {

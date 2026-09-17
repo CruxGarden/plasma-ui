@@ -28,7 +28,7 @@ export interface RendererSettings {
   stretch: number;
   /** Slow ripple along the outline. 0 = still edges. */
   flow: number;
-  /** Default glass tint (hex). */
+  /** Default plasma tint (hex). */
   tint: string;
   /** Default tint strength, 0 (clear) to 1 (solid color). */
   opacity: number;
@@ -470,9 +470,9 @@ export class PlasmaRenderer {
       else if (r.el.style.scale) r.el.style.scale = "";
     });
 
-    // Viscous surface: each glass box is a spring that chases its element (in page
+    // Viscous surface: each plasma box is a spring that chases its element (in page
     // coordinates, so scrolling doesn't count as motion). The drawn shape is the union
-    // of the element and the spring, so content never leaves the glass: moving panels
+    // of the element and the spring, so content never leaves the plasma: moving panels
     // leave a trailing stretch, and stopping panels overshoot forward before settling.
     const v = Math.min(Math.max(s.viscosity, 0), 1);
     const st = Math.max(s.stretch, 0);
@@ -554,7 +554,7 @@ export class PlasmaRenderer {
     };
     const k = this.dpr / 1.25;
 
-    // 0. background, plus two blurred copies for frosted glass
+    // 0. background, plus two blurred copies for frosted plasma
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.rtBg.fb);
     gl.viewport(0, 0, this.rtBg.w, this.rtBg.h);
     gl.useProgram(this.progs.bg.pr);

@@ -1,4 +1,4 @@
-/** Default maximum glass shapes drawn at once (offscreen shapes are culled first). */
+/** Default maximum plasma shapes drawn at once (offscreen shapes are culled first). */
 export const DEFAULT_MAX_SHAPES = 16;
 /** Maximum concurrent pulses. */
 export const MAX_PULSES = 4;
@@ -191,7 +191,7 @@ void main(){
   o = vec4(bg(bp), 1.);
 }`;
 
-/** Pass 3: smoothed outline and glass shading over the background textures. */
+/** Pass 3: smoothed outline and plasma shading over the background textures. */
 const compFrag = `#version 300 es
 ${common}
 uniform sampler2D uH, uS, uTint, uBg, uBgM, uBgH, uFrost;
@@ -202,7 +202,7 @@ out vec4 o;
 vec3 pal(float t){ return .5 + .5*cos(6.2831*(t + vec3(0., .33, .67))); }
 float H(vec2 uv){ return texture(uH, uv).r; }
 vec2 uvAt(vec2 q){ return vec2(q.x, uRes.y - q.y) / uRes; }
-// background seen through glass with frost f: sharp, then medium, then heavy blur
+// background seen through plasma with frost f: sharp, then medium, then heavy blur
 vec3 seen(vec2 q, float f){
   vec2 u = uvAt(q);
   vec3 sharp = texture(uBg, u).rgb;
@@ -270,7 +270,7 @@ void main(){
       seen(p + off*(1.-disp), fr).b
     );
     refr = mix(refr, vec3(dot(refr, vec3(.333))), .18) * mix(1.08, .9, uLight) + .03*(1.-uLight);
-    // frosted glass: milkier and a little brighter
+    // frosted: milkier and a little brighter
     refr = mix(refr, mix(refr, vec3(dot(refr, vec3(.333))), .25) * mix(1.12, .97, uLight) + mix(.05, .03, uLight), fr);
     float hl = 1. - .55*uLight;
 
@@ -290,16 +290,16 @@ void main(){
     if (uRimMode > .5 && uRimMode < 1.5) rimCol = uRimColor * facing * 1.4;
     else if (uRimMode > 1.5) rimCol = tcol * facing * 1.4;
 
-    vec3 glass = refr;
-    glass += rimCol * fres * .45 * hl * uRim;
-    glass += vec3(1.) * spec * .75 * hl * uSpec;
+    vec3 plasma = refr;
+    plasma += rimCol * fres * .45 * hl * uRim;
+    plasma += vec3(1.) * spec * .75 * hl * uSpec;
     // faint shimmer across the body; fades out as the tint becomes opaque
-    glass += pal(uTime*.04 + p.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha);
+    plasma += pal(uTime*.04 + p.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha);
     vec3 hairCol = uRimMode > .5 ? mix(vec3(1.), rimCol / 1.4, .6) : vec3(.9,.95,1.);
-    glass += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
+    plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
 
     float a = smoothstep(-.8, .8, sd);
-    col = mix(col, glass, a);
+    col = mix(col, plasma, a);
     grain = 1. - a;   // grain is background-only; panels stay clean
   }
   col += (hash(p + uTime) - .5) * .025 * grain;

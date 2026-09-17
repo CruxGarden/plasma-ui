@@ -1,6 +1,6 @@
 # Security Policy
 
-This file covers `@cruxgarden/plasma-ui`, the React liquid-glass workspace library.
+This file covers `@cruxgarden/plasma-ui`, the React liquid panels library.
 The desktop app has its own policy in the `app` repository, the API in `api`, and the
 command line tool in `cli`.
 
