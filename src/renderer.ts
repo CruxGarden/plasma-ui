@@ -392,7 +392,7 @@ export class PlasmaRenderer {
   private onScroll = () => {
     this.scrolling = true;
     clearTimeout(this.scrollIdle);
-    this.scrollIdle = setTimeout(() => { this.scrolling = false; }, 140);
+    this.scrollIdle = setTimeout(() => { this.scrolling = false; }, 400);
   };
 
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
@@ -457,8 +457,10 @@ export class PlasmaRenderer {
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0.016;
     this.last = now;
     const s = this.settings;
-    const still = s.reducedMotion || (this.coarse && this.scrolling);
-    // Reduced motion slows the field to 40%; a fling stops it outright.
+    // A fling stops the field's own drift, and nothing else. The springs work
+    // in page coordinates, so scrolling never disturbed them - snapping them
+    // here only made the geometry jump each time the flag flipped, which is
+    // what flickered. Reduced motion still slows the field to 40%.
     this.time += dt * (this.coarse && this.scrolling ? 0 : s.reducedMotion ? 0.4 : 1);
 
     // ease shared state
@@ -475,7 +477,7 @@ export class PlasmaRenderer {
     const list: Rec[] = [];
     this.recs.forEach(r => {
       if (!r.el.isConnected) return;
-      if (!still) {
+      if (!s.reducedMotion) {
         r.formV += (170 * (1 - r.form) - 12 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
@@ -511,7 +513,7 @@ export class PlasmaRenderer {
       if (key !== r.sidesKey) { r.sidesKey = key; r.onSides?.(sides); }
 
       let tx = 0, ty = 0;
-      if (r.lean > 0 && !joined && !r.dragging && !still) {
+      if (r.lean > 0 && !joined && !r.dragging && !s.reducedMotion) {
         const dx = m.tx - (a.l + a.w / 2), dy = m.ty - (a.t + a.h / 2);
         const pull = Math.exp(-(dx * dx + dy * dy) / 120000) * r.lean * m.amt;
         const len = Math.hypot(dx, dy) || 1;
@@ -530,7 +532,7 @@ export class PlasmaRenderer {
       if (lean !== r.leanCss) { r.leanCss = lean; r.el.style.translate = lean; }
 
       const u = (this.time - r.pulseAt) / 0.36;
-      const scale = r.pulseAt >= 0 && u >= 0 && u <= 1 && !still
+      const scale = r.pulseAt >= 0 && u >= 0 && u <= 1 && !s.reducedMotion
         ? String(1 + 0.04 * r.pulseS * Math.sin(Math.PI * u))
         : "";
       if (scale !== r.scaleCss) { r.scaleCss = scale; r.el.style.scale = scale; }
@@ -558,7 +560,7 @@ export class PlasmaRenderer {
       const rr = r.el.getBoundingClientRect(); // includes pulse scale and lean
       const tgt = [rr.left + sx, rr.top + sy, rr.right + sx, rr.bottom + sy];
       const sp = r.sp;
-      if (!sp.live || st < 0.01 || still) { sp.e = tgt.slice(); sp.v = [0, 0, 0, 0]; sp.live = true; }
+      if (!sp.live || st < 0.01 || s.reducedMotion) { sp.e = tgt.slice(); sp.v = [0, 0, 0, 0]; sp.live = true; }
       else {
         for (let k = 0; k < steps; k++) for (let j = 0; j < 4; j++) {
           sp.v[j] += (stiff * (tgt[j] - sp.e[j]) - damp * sp.v[j]) * h;
