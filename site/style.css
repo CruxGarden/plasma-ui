@@ -21,12 +21,14 @@ html { scroll-behavior: smooth; scroll-padding-top: 96px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 Onest, system-ui, sans-serif; }
 main { max-width: 1120px; margin: 0 auto; padding: 120px 24px 48px; }
-h1, h2, h3 { font-family: "Chakra Petch", system-ui, sans-serif; font-weight: 500; margin: 0; letter-spacing: .005em; }
-/* The Crux Garden wordmark serif, for the title only; headings stay sans.
-   A serif carries less weight per point, so it runs a little larger. */
-h1 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; font-size: clamp(3.4rem, 10vw, 6.4rem); line-height: .95; letter-spacing: .01em; }
-h2 { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.1; }
-h3 { font-size: 1.15rem; line-height: 1.25; }
+/* Every title is set in Crux Garden's wordmark serif. A serif carries less
+   weight per point, so each level runs larger than the sans it replaced, and
+   the smallest goes up a weight instead: Cormorant's hairlines drop out below
+   about 1.2rem on a dark background. */
+h1, h2, h3 { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 500; margin: 0; letter-spacing: .01em; }
+h1 { font-size: clamp(3.4rem, 10vw, 6.4rem); line-height: .95; }
+h2 { font-size: clamp(2.2rem, 4.6vw, 3.1rem); line-height: 1.08; }
+h3 { font-size: 1.4rem; line-height: 1.2; font-weight: 600; }
 p { margin: .5rem 0 0; }
 a { color: inherit; }
 code, pre { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; font-size: .86em; }
@@ -46,7 +48,7 @@ section { margin-top: 140px; }
 .nav.plasma-fallback { background: linear-gradient(160deg, rgb(20 40 52 / .72), rgb(10 22 30 / .6)); }
 :root[data-theme="light"] .nav.plasma-fallback { background: linear-gradient(160deg, rgb(255 255 255 / .7), rgb(235 242 245 / .55)); }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .nav.plasma-fallback { background: linear-gradient(160deg, rgb(255 255 255 / .7), rgb(235 242 245 / .55)); } }
-.brand { font-family: "Chakra Petch", sans-serif; font-weight: 500; font-size: 1.1rem; text-decoration: none; white-space: nowrap; }
+.brand { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 1.45rem; text-decoration: none; white-space: nowrap; }
 .nav-links { display: flex; gap: 18px; margin-right: auto; }
 .nav-links a { text-decoration: none; color: var(--muted); font-size: .95rem; }
 .nav-links a:hover { color: var(--text); }
