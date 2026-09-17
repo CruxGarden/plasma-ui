@@ -15,7 +15,7 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; overflow: hidden; color: var(--text); font: 400 15px/1.5 Onest, system-ui, sans-serif; background: #04111c; }
-h2 { font: 500 1.02rem "Chakra Petch", sans-serif; margin: 0 0 6px; }
+h2 { font: 600 1.25rem "Cormorant Garamond", Georgia, serif; letter-spacing: .01em; margin: 0 0 6px; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 
 .app { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
@@ -25,6 +25,9 @@ h2 { font: 500 1.02rem "Chakra Petch", sans-serif; margin: 0 0 6px; }
 
 .bar { flex: none; }
 .bar .plate { padding: 8px 8px 8px 16px; min-height: 42px; }
+/* The app's name in Crux Garden's wordmark serif, weight 600 so Cormorant's
+   hairlines hold at this size. Panel headings stay sans: they are chrome. */
+.wordmark { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 1.35rem; letter-spacing: .01em; }
 .hint { color: var(--muted); font-size: .85rem; margin-right: auto; }
 .seg { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--code); }
 .seg button { font: 500 .82rem Onest; color: var(--text); background: none; border: 0; cursor: pointer; padding: .35rem .7rem; border-radius: 999px; }

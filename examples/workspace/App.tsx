@@ -85,7 +85,7 @@ export function App() {
       <div className="app">
         <Plasma as="header" className="bar" radius={22} lean={false} padding={18} elevation={0.5} fuse={false}>
           <div className="plate row">
-            <strong>Workspace</strong>
+            <strong className="wordmark">Workspace</strong>
             <span className="hint">an example app built with Plasma UI - drag any panel</span>
             <div className="seg" role="group" aria-label="Mood">
               {(["tidal", "aurora", "ember"] as MoodName[]).map(m => (
