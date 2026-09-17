@@ -78,12 +78,14 @@ interface Rec extends ShapeOptions {
   el: HTMLElement;
   form: number; formV: number; removing: boolean;
   lx: number; ly: number;
-  /** Last translate and scale written, so an unchanged frame writes nothing. */
+  /**
+   * Last translate and scale written, so an unchanged frame writes nothing.
+   * These are written before the rect is read on purpose: the spring's target
+   * has to include this frame's lean, or the plasma trails the DOM by a frame
+   * and shimmers wherever the pointer keeps lean alive.
+   */
   leanCss: string;
   scaleCss: string;
-  /** This frame's values, applied only after every layout read is done. */
-  wantLean: string;
-  wantScale: string;
   joined: boolean; dragging: boolean;
   layoutBox: (() => Box) | null;
   pulseAt: number; pulseS: number;
@@ -184,6 +186,10 @@ export class PlasmaRenderer {
   private time = 0;
   private dpr = 1;
   private resizeQueued = false;
+  /** Touch devices only: momentum scrolling is the case this exists for. */
+  private coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  private scrolling = false;
+  private scrollIdle: ReturnType<typeof setTimeout> | undefined;
   private energy = 0;
   private mouse = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
   private pulses: number[][] = Array.from({ length: MAX_PULSES }, () => [0, 0, -99, 0]);
@@ -236,6 +242,7 @@ export class PlasmaRenderer {
     this.mouse.x = this.mouse.tx = innerWidth / 2;
     this.mouse.y = this.mouse.ty = innerHeight / 2;
     addEventListener("resize", this.resize);
+    if (this.coarse) addEventListener("scroll", this.onScroll, { passive: true });
     addEventListener("pointermove", this.onPointer, { passive: true });
     document.addEventListener("pointerleave", this.onLeave);
     this.applyResize();
@@ -316,7 +323,7 @@ export class PlasmaRenderer {
     const id = this.nextId++;
     const rec: Rec = {
       id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false,
-      lx: 0, ly: 0, leanCss: "", scaleCss: "", wantLean: "", wantScale: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
+      lx: 0, ly: 0, leanCss: "", scaleCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
     this.recs.set(id, rec);
@@ -367,12 +374,26 @@ export class PlasmaRenderer {
   destroy() {
     cancelAnimationFrame(this.raf);
     removeEventListener("resize", this.resize);
+    removeEventListener("scroll", this.onScroll);
+    clearTimeout(this.scrollIdle);
     removeEventListener("pointermove", this.onPointer);
     document.removeEventListener("pointerleave", this.onLeave);
     this.recs.forEach(r => { r.el.style.translate = ""; r.el.style.scale = ""; });
     this.recs.clear();
     this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
+
+  /**
+   * A fling on iOS is driven by the compositor, and rAF is deferred while it
+   * runs - so anything recomputed per frame arrives late and the plasma visibly
+   * trails the content it belongs to. Holding the material still through the
+   * scroll is better than animating it a few frames behind.
+   */
+  private onScroll = () => {
+    this.scrolling = true;
+    clearTimeout(this.scrollIdle);
+    this.scrollIdle = setTimeout(() => { this.scrolling = false; }, 140);
+  };
 
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
   private onLeave = () => { this.mouse.target = 0; };
@@ -436,7 +457,9 @@ export class PlasmaRenderer {
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0.016;
     this.last = now;
     const s = this.settings;
-    this.time += dt * (s.reducedMotion ? 0.4 : 1);
+    const still = s.reducedMotion || (this.coarse && this.scrolling);
+    // Reduced motion slows the field to 40%; a fling stops it outright.
+    this.time += dt * (this.coarse && this.scrolling ? 0 : s.reducedMotion ? 0.4 : 1);
 
     // ease shared state
     const m = this.mouse;
@@ -452,7 +475,7 @@ export class PlasmaRenderer {
     const list: Rec[] = [];
     this.recs.forEach(r => {
       if (!r.el.isConnected) return;
-      if (!s.reducedMotion) {
+      if (!still) {
         r.formV += (170 * (1 - r.form) - 12 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
@@ -488,7 +511,7 @@ export class PlasmaRenderer {
       if (key !== r.sidesKey) { r.sidesKey = key; r.onSides?.(sides); }
 
       let tx = 0, ty = 0;
-      if (r.lean > 0 && !joined && !r.dragging && !s.reducedMotion) {
+      if (r.lean > 0 && !joined && !r.dragging && !still) {
         const dx = m.tx - (a.l + a.w / 2), dy = m.ty - (a.t + a.h / 2);
         const pull = Math.exp(-(dx * dx + dy * dy) / 120000) * r.lean * m.amt;
         const len = Math.hypot(dx, dy) || 1;
@@ -501,14 +524,16 @@ export class PlasmaRenderer {
       // getBoundingClientRect below then forced a reflow to resolve it.
       // Below a twentieth of a pixel there is nothing to see, so settle.
       if (Math.abs(tx - r.lx) < 0.05 && Math.abs(ty - r.ly) < 0.05) { r.lx = tx; r.ly = ty; }
-      r.wantLean = tx === 0 && ty === 0 && r.lx === 0 && r.ly === 0
+      const lean = tx === 0 && ty === 0 && r.lx === 0 && r.ly === 0
         ? ""
         : `${r.lx.toFixed(2)}px ${r.ly.toFixed(2)}px`;
+      if (lean !== r.leanCss) { r.leanCss = lean; r.el.style.translate = lean; }
 
       const u = (this.time - r.pulseAt) / 0.36;
-      r.wantScale = r.pulseAt >= 0 && u >= 0 && u <= 1 && !s.reducedMotion
+      const scale = r.pulseAt >= 0 && u >= 0 && u <= 1 && !still
         ? String(1 + 0.04 * r.pulseS * Math.sin(Math.PI * u))
         : "";
+      if (scale !== r.scaleCss) { r.scaleCss = scale; r.el.style.scale = scale; }
     });
 
     // Viscous surface: each plasma box is a spring that chases its element (in page
@@ -533,7 +558,7 @@ export class PlasmaRenderer {
       const rr = r.el.getBoundingClientRect(); // includes pulse scale and lean
       const tgt = [rr.left + sx, rr.top + sy, rr.right + sx, rr.bottom + sy];
       const sp = r.sp;
-      if (!sp.live || st < 0.01 || s.reducedMotion) { sp.e = tgt.slice(); sp.v = [0, 0, 0, 0]; sp.live = true; }
+      if (!sp.live || st < 0.01 || still) { sp.e = tgt.slice(); sp.v = [0, 0, 0, 0]; sp.live = true; }
       else {
         for (let k = 0; k < steps; k++) for (let j = 0; j < 4; j++) {
           sp.v[j] += (stiff * (tgt[j] - sp.e[j]) - damp * sp.v[j]) * h;
@@ -544,16 +569,6 @@ export class PlasmaRenderer {
       const l = Math.min(tgt[0], sp.e[0]) - sx, t = Math.min(tgt[1], sp.e[1]) - sy;
       const rgt = Math.max(tgt[2], sp.e[2]) - sx, btm = Math.max(tgt[3], sp.e[3]) - sy;
       r.drawn = { l, t, w: rgt - l, h: btm - t };
-    });
-
-    // Every layout read for this frame is done, so the writes land here. Doing
-    // them before the read above forced a synchronous layout each frame, which
-    // is what a compositor-driven scroll on iOS cannot absorb: the motion was
-    // smooth but scrolling stuttered. Lean and pulse both ease over hundreds of
-    // milliseconds, so taking effect a frame later is not visible.
-    list.forEach(r => {
-      if (r.wantLean !== r.leanCss) { r.leanCss = r.wantLean; r.el.style.translate = r.wantLean; }
-      if (r.wantScale !== r.scaleCss) { r.scaleCss = r.wantScale; r.el.style.scale = r.wantScale; }
     });
 
     this.draw(list.slice(0, this.max));
