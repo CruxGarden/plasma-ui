@@ -84,12 +84,6 @@ section { margin-top: 140px; }
 .hero-install code { font-size: .95rem; }
 
 /* steps: no gaps, so they render as one surface */
-.steps { display: grid; grid-template-columns: repeat(4, 1fr); }
-.step { display: flex; min-height: 288px; }
-.step .plate { flex: 1; padding: 18px 20px 22px; }
-.step-n { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; color: var(--muted); font-size: 1.25rem; }
-.step h3 { margin-top: .75rem; }
-.step p { color: var(--muted); font-size: .95rem; }
 
 /* playground */
 .play { display: grid; grid-template-columns: 1fr 312px; gap: 64px; align-items: start; }
@@ -157,7 +151,6 @@ tr:last-child td { border-bottom: 0; }
 .footer { margin-top: 120px; color: var(--muted); font-size: .9rem; }
 
 @media (max-width: 900px) {
-  .steps { grid-template-columns: repeat(2, 1fr); }
   .play { grid-template-columns: 1fr; }
   .nav-links { display: none; }
 }
@@ -165,8 +158,6 @@ tr:last-child td { border-bottom: 0; }
   main { padding-top: 100px; }
   .nav .seg button { padding: .35rem .4rem; font-size: .73rem; }
   .nav { gap: 10px; padding-left: 14px; }
-  .steps { grid-template-columns: 1fr; }
-  .step { min-height: 0; }
   .hero-title { padding: 32px 26px; }
   .hero-install { padding: 18px 26px; width: 100%; }
   .hero-install code { white-space: normal; word-break: break-word; font-size: .85rem; }

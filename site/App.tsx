@@ -89,7 +89,6 @@ export function App() {
       <main style={{ ["--plate-bg" as string]: `color-mix(in srgb, ${s.tint} ${Math.round(Math.min(Math.max(s.opacity, 0), 1) * 40)}%, var(--plate))` }}>
         <Hero />
         <Usage />
-        <HowItWorks />
         <Playground s={s} set={set} reset={() => { setS(DEFAULTS); setConfig("Lumen"); }} />
         <Api />
         <Limitations />
@@ -105,7 +104,6 @@ function Nav({ config, apply }: { config: string | null; apply: (name: string) =
     <nav className="nav plasma-fallback" aria-label="Sections">
       <a className="brand" href="#top">Plasma UI</a>
       <div className="nav-links">
-        <a href="#how">How it works</a>
         <a href="#playground">Playground</a>
         <a href="#api">API</a>
         <a href="examples/workspace/" target="_blank" rel="noreferrer">Example app</a>
@@ -144,39 +142,6 @@ function Hero() {
           <code>npm install @cruxgarden/plasma-ui</code>
         </Plasma>
       </div>
-    </section>
-  );
-}
-
-const STEPS = [
-  { title: "Silhouette", body: "Every <Plasma> element reports its box each frame. One shader draws them as a single shape: gaps and corners blend, aligned edges stay straight." },
-  { title: "Smoothing", body: "The silhouette is blurred and traced at its halfway contour. Kinks round off; steps become even curves, like surface tension." },
-  { title: "Height", body: "A heavier blur becomes a height map. Its slope sets how much light bends, so joined panels act as one lens." },
-  { title: "Light", body: "The last pass refracts the background, splits color at the edges, and adds a rim and a pointer highlight." },
-];
-
-function HowItWorks() {
-  return (
-    <section id="how">
-      <h2>How it works</h2>
-      <p className="section-lede">
-        Markup stays ordinary HTML. One canvas behind the page draws all the glass.
-        These four cards touch, so they render as one surface.
-      </p>
-      <div className="steps">
-        {STEPS.map((st, i) => (
-          <Plasma key={st.title} className="step" radius={30} lean={false} padding={20}>
-            <div className="plate">
-              <span className="step-n">{i + 1}</span>
-              <h3>{st.title}</h3>
-              <p>{st.body}</p>
-            </div>
-          </Plasma>
-        ))}
-      </div>
-      <p className="note">
-        Without WebGL2, each <code>Plasma</code> falls back to a CSS frosted panel.
-      </p>
     </section>
   );
 }
