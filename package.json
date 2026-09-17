@@ -17,10 +17,7 @@
     "build:example": "node examples/workspace/build.mjs",
     "build:pages": "node scripts/build-pages.mjs"
   },
-  "author": {
-    "name": "Crux Garden",
-    "url": "https://github.com/cruxgarden"
-  },
+  "author": "The Keeper",
   "license": "MIT",
   "devDependencies": {
     "@types/react": "^18.3.31",
@@ -52,6 +49,8 @@
     "react-dom": ">=18"
   },
   "keywords": [
+    "crux",
+    "cruxgarden",
     "react",
     "webgl",
     "glass",
@@ -61,10 +60,10 @@
   "homepage": "https://cruxgarden.github.io/plasma-ui/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cruxgarden/plasma-ui.git"
+    "url": "git+https://github.com/CruxGarden/plasma-ui.git"
   },
   "bugs": {
-    "url": "https://github.com/cruxgarden/plasma-ui/issues"
+    "url": "https://github.com/CruxGarden/plasma-ui/issues"
   },
   "engines": {
     "node": ">=18"
