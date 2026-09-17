@@ -48,6 +48,10 @@ section { margin-top: 140px; }
 .nav-links { display: flex; gap: 18px; margin-right: auto; }
 .nav-links a { text-decoration: none; color: var(--muted); font-size: .95rem; }
 .nav-links a:hover { color: var(--text); }
+/* Repo link: last in the bar, and the one nav item that survives narrow widths. */
+.repo { display: inline-flex; align-items: center; color: var(--muted); text-decoration: none; }
+.repo:hover { color: var(--text); }
+.repo svg { display: block; }
 
 .seg { display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--code); }
 .seg button, .btn {
