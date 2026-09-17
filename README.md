@@ -1,18 +1,18 @@
 # Plasma UI
 
-Liquid panels for React. Every `<Plasma>` panel joins one shared plasma: surfaces fuse on contact, refract what's behind them, and snap to a grid when dragged. Built for workspace and canvas UIs - tool panels, dashboards, launchers - by [Crux Garden](https://github.com/cruxgarden).
+Liquid panels for React, inspired by Apple's Liquid Glass design. The `<Plasma>` panel looks and behaves like liquid, with surface tension that fuses on contact with other panels. Anything visible behind the panel is refracted. And for layout convenience, the panels ultimately snap to a grid layout. The library is a work in progress, extracted from the [Crux Garden](https://github.com/cruxgarden) project, but it seemed useful enough to share in it's current form.
 
 ![Five panels in a workspace: one is dragged out of its group and travels as liquid, another is dropped against a neighbour and fuses into it, and each snaps to the 24px grid](docs/demo.gif)
 
-[**Try it**](https://cruxgarden.github.io/plasma-ui/) · [workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/)
+[Playground and Docs](https://cruxgarden.github.io/plasma-ui/) · [Workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/)
 
-**Status: 0.2.0.** The core material is stable and tested; the API may change between minor versions before 1.0.
+**Status: 0.2.0.** Core is stable and tested, but the API may change.
 
 ```bash
 npm install @cruxgarden/plasma-ui
 ```
 
-Zero dependencies beyond React.
+Zero dependencies, except for React.
 
 ```tsx
 import { PlasmaProvider, Plasma } from "@cruxgarden/plasma-ui";
@@ -33,31 +33,7 @@ export function App() {
 
 ## Example
 
-[`examples/workspace`](examples/workspace) is a small working app - inbox, reader, tasks, and a player as draggable fused panels, with focus-driven elevation and layout persisted to localStorage. `node examples/workspace/build.mjs` builds it to a single html file.
-
-## Not yet
-
-Plasma UI 0.1 is a workspace library, not a full UI system. Know these before adopting:
-
-- **No layers.** Overlapping surfaces fuse. Dialogs, menus, toasts, and fixed bars must be plain CSS for now (the docs site's own nav shows the pattern).
-- **No clipping in scroll containers.** Plasma inside a scrollable list draws past its edges. Scrolling _inside_ one panel is fine.
-- **No drag or resize handles.** `draggable` moves the whole surface; mark interactive children `data-plasma-nodrag`.
-- **Draws its own background.** Browsers don't let WebGL read the rendered page, so the plasma refracts its background layer - the procedural mood field, or any color, image, canvas, or video you pass via `background` - rather than your live DOM. Custom background shaders aren't supported yet.
-- **Rounded rectangles only.** No rotation or arbitrary shapes.
-
-All of these are on the roadmap below.
-
-## How it works
-
-Markup stays ordinary HTML. `PlasmaProvider` renders one fixed canvas behind the page. Each frame:
-
-1. **Silhouette.** Every registered element reports its box; one shader draws them as a single shape. Corners against a neighbor square off, and blending applies only where surfaces face different ways, so flush panels share a clean outline while gaps and steps get rounded fillets.
-2. **Smoothing.** The silhouette is blurred and traced at its halfway contour, evening out curvature.
-3. **Height.** A heavier blur becomes a height map; its slope drives refraction, so joined panels act as one lens.
-4. **Tint and frost.** Color and translucency spread across the material with the same blur, so different values flow into each other across joins. The background renders once to a texture; two blurred copies serve the frosted plasma.
-5. **Light.** The final pass refracts the background, splits color at the edges, and adds a rim and a pointer highlight.
-
-Without WebGL2, `Plasma` falls back to a CSS frosted panel.
+[`examples/workspace`](examples/workspace) demonstrates how the library can be used for a real-world dashboard layout.
 
 ## `<PlasmaProvider>`
 
@@ -91,7 +67,7 @@ Without WebGL2, `Plasma` falls back to a CSS frosted panel.
 
 ## `<Plasma>`
 
-Accepts all HTML attributes plus:
+Accepts all HTML attributes, plus the following:
 
 | Prop                                    | Type                     | Default  | Description                                                                                                         |
 | --------------------------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -126,19 +102,19 @@ const dusk: Mood = {
 };
 ```
 
-## Motion feel
+## Motion
 
-Each surface is a spring chasing its element, and the drawn plasma always covers the element. Moving panels leave a trailing stretch; stopping ones overshoot before settling. Scrolling doesn't count as motion.
+Each panel undulates like a Slinky when moving. Three properties control this movement: viscosity, stretch, and flow.
 
 ```tsx
 <PlasmaProvider viscosity={0.1} stretch={1.3} flow={0.6} />  // water
-<PlasmaProvider viscosity={0.85} stretch={1.8} />             // honey
-<PlasmaProvider stretch={0} />                                // the plasma tracks panels exactly
+<PlasmaProvider viscosity={0.85} stretch={1.8} />            // honey
+<PlasmaProvider stretch={0} />                               // the plasma tracks panels exactly
 ```
 
-`flow` ripples the outline, so leave it at `0` where flush edges should stay perfectly straight.
+NOTE: `flow` ripples the outline, so leave it at `0` whenever flush edges should stay perfectly straight.
 
-## Styling the rim
+## Styling the rim (fancy outline)
 
 ```tsx
 // solid cyan rim, a bit wider, no pointer highlight
@@ -155,27 +131,27 @@ Each surface is a spring chasing its element, and the drawn plasma always covers
 
 ## Guidelines
 
-- Use plasma for containers: panels, docks, cards, dialogs. Small controls read better as regular HTML on top.
-- Place surfaces either flush (they become one piece) or further apart than the blend distance. Smaller gaps render as liquid bridging.
-- Up to `maxSurfaces` (default 16) draw at once; offscreen ones are skipped first. Two render passes loop over every slot per pixel, so raise it only as far as you need.
-- Lean and pulses use the CSS `translate` and `scale` properties, and drag uses `transform`, so they compose with each other. Avoid setting those on `Plasma` elements yourself.
-- `prefers-reduced-motion` disables lean, pulses, the pointer drop, and springs.
+- Use Plasma for container components: panels, docks, cards, dialogs. Components should be nested inside.
+- Place surfaces together or further apart than the Blend distance. Smaller gaps render as liquid bridging them.
+- Up to `maxSurfaces` (default 16) draw at once; offscreen panels are skipped first. Two render passes loop over every slot per pixel, so set this value only as high as you need.
+- Lean and Pulse use the CSS `translate` and `scale` properties, and Drag uses `transform`. Avoid setting these properties on `Plasma` elements yourself.
+- `prefers-reduced-motion` disables Lean, Pulse, the pointer Drop, and Spring.
 
 ## Roadmap
 
-In priority order. Not a schedule.
+Ordered by priority:
 
-1. **Layers** - independent materials that stack instead of fusing, for dialogs, menus, and fixed chrome over plasma.
-2. **Drag handles and resize** - `handle` prop so panel content stays fully interactive; edge resize with grid snapping.
+1. **Layers** - panels that will stack instead of fusing. For use with dialogs, menus, and such.
+2. **Drag handles and resize** - will add a `handle` prop for dragging, so panel content can be fully interactive. Also, edge resizing with grid snapping.
 3. **Scroll clipping** - plasma confined to scrollable containers.
-4. **Pluggable backgrounds** - colors, images, and live canvas/video shipped in 0.1 (`background` prop); custom shaders next.
-5. **Shapes** - rotation and non-rectangular outlines.
+4. **Pluggable Backgrounds** - colors, images, and live canvas/video shipped in 0.1 (`background` prop); custom shaders are next.
+5. **Shapes and Orientation** - non-rectangular outlines, rotation...etc.
 
-Contributions welcome on any of these - see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions welcome for any of these - see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Browser support
 
-Chrome, Edge, Firefox, and Safari 16.4+ (WebGL2). Elsewhere, `Plasma` renders as a CSS frosted panel and all layout, drag, and snap behavior still works.
+Chrome, Edge, Firefox, and Safari 16.4+ (WebGL2). In non-supported browsers, `Plasma` renders as a CSS frosted panel and all layout, drag, and snap behavior still works.
 
 ## Development
 
@@ -202,7 +178,7 @@ does — see [PUBLISH.md](PUBLISH.md).
 
 ## Used by
 
-- [Crux Garden](https://github.com/cruxgarden) - the workspace Plasma UI was built for.
+- [Crux Garden](https://github.com/cruxgarden) - the project Plasma UI was originally built for.
 
 Using it in something? Add yours in a PR.
 
