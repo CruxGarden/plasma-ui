@@ -1,6 +1,6 @@
 # Plasma UI
 
-Fluid panels for React. Every `<Plasma>` panel joins one shared plasma: surfaces fuse on contact, refract what's behind them, and snap to a grid when dragged. Built for workspace and canvas UIs - tool panels, dashboards, launchers - by [Crux Garden](https://github.com/cruxgarden).
+Liquid panels for React. Every `<Plasma>` panel joins one shared plasma: surfaces fuse on contact, refract what's behind them, and snap to a grid when dragged. Built for workspace and canvas UIs - tool panels, dashboards, launchers - by [Crux Garden](https://github.com/cruxgarden).
 
 ![Dragging a panel: it tears off its group, travels as liquid, fuses with another panel, and snaps to the grid](docs/demo.gif)
 
