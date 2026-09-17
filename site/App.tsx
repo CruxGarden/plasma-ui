@@ -67,6 +67,12 @@ const DEFAULTS: Settings = {
   magnet: 40,
 };
 
+/**
+ * Mobile scroll experiment: pin the plasma to the page during a fling and
+ * resume when it stops. Flip to false to compare against the live renderer.
+ */
+const FREEZE_ON_SCROLL = true;
+
 const PANEL_W = 216,
   PANEL_H = 144;
 // Full configurations shown in the nav: one look per use case.
@@ -253,6 +259,7 @@ export function App() {
     <PlasmaProvider
       mood={s.mood}
       theme={s.theme}
+      freezeOnScroll={FREEZE_ON_SCROLL}
       blend={s.blend}
       refraction={s.refraction}
       dispersion={s.dispersion}

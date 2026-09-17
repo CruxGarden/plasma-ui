@@ -14,6 +14,8 @@ export interface RendererSettings {
   theme: "auto" | "light" | "dark";
   quality: number;
   reducedMotion: boolean;
+  /** Touch devices: pin the last frame to the page during a fling and resume when it stops. */
+  freezeOnScroll: boolean;
   /** Rim color: "iridescent", "tint" (each surface's tint), or a hex color. */
   rimColor: string;
   /** Rim width multiplier. */
@@ -186,6 +188,13 @@ export class PlasmaRenderer {
   private time = 0;
   private dpr = 1;
   private resizeQueued = false;
+  /** Coarse pointer = touch. Only there does a fling run on the compositor with rAF deferred. */
+  private coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  private frozen = false;
+  private scrollIdle: ReturnType<typeof setTimeout> | undefined;
+  private resizeWhileFrozen = false;
+  /** Scroll offset the last frame was drawn for: where the pinned image belongs on the page. */
+  private drawnScroll = [0, 0];
   private energy = 0;
   private mouse = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
   private pulses: number[][] = Array.from({ length: MAX_PULSES }, () => [0, 0, -99, 0]);
@@ -239,6 +248,8 @@ export class PlasmaRenderer {
     this.mouse.y = this.mouse.ty = innerHeight / 2;
     addEventListener("resize", this.resize);
     document.addEventListener("visibilitychange", this.onVisibility);
+    // The setting is read per event, so it can be toggled through configure().
+    if (this.coarse) addEventListener("scroll", this.onScroll, { passive: true });
     addEventListener("pointermove", this.onPointer, { passive: true });
     document.addEventListener("pointerleave", this.onLeave);
     this.applyResize();
@@ -374,6 +385,8 @@ export class PlasmaRenderer {
     cancelAnimationFrame(this.raf);
     removeEventListener("resize", this.resize);
     document.removeEventListener("visibilitychange", this.onVisibility);
+    removeEventListener("scroll", this.onScroll);
+    clearTimeout(this.scrollIdle);
     removeEventListener("pointermove", this.onPointer);
     document.removeEventListener("pointerleave", this.onLeave);
     this.recs.forEach(r => { r.el.style.translate = ""; r.el.style.scale = ""; });
@@ -389,7 +402,50 @@ export class PlasmaRenderer {
    */
   private onVisibility = () => {
     if (document.hidden) { cancelAnimationFrame(this.raf); this.raf = 0; }
-    else if (!this.raf) { this.last = 0; this.raf = requestAnimationFrame(this.frame); }
+    else if (!this.raf && !this.frozen) { this.last = 0; this.raf = requestAnimationFrame(this.frame); }
+  };
+
+  /**
+   * A fling on a touch device is driven by the compositor, and rAF is deferred
+   * while it runs, so anything JS repositions arrives late: the plasma trails
+   * the panels it belongs to. Instead of chasing, the canvas is pinned to the
+   * page for the duration - the last drawn frame becomes a texture that
+   * scrolls with the content, moved by the compositor with no JS in the path -
+   * and the loop resumes once the scroll events stop.
+   *
+   * The field's scroll parallax is 1:1 on these devices (see draw), so the
+   * pinned image and the first live frame after it line up.
+   */
+  private onScroll = () => {
+    if (!this.settings.freezeOnScroll) return;
+    if (!this.frozen) this.freeze();
+    clearTimeout(this.scrollIdle);
+    this.scrollIdle = setTimeout(this.thaw, 120);
+  };
+
+  private freeze() {
+    const c = this.canvas;
+    cancelAnimationFrame(this.raf); this.raf = 0;
+    // Absolute, sized in pixels so a positioned ancestor cannot stretch it,
+    // then offset so it sits exactly where the fixed canvas was a moment ago.
+    c.style.inset = "";
+    c.style.width = `${innerWidth}px`; c.style.height = `${innerHeight}px`;
+    c.style.position = "absolute"; c.style.top = "0px"; c.style.left = "0px";
+    const r = c.getBoundingClientRect();
+    c.style.top = `${-r.top - (scrollY - this.drawnScroll[1])}px`;
+    c.style.left = `${-r.left - (scrollX - this.drawnScroll[0])}px`;
+    this.frozen = true;
+  }
+
+  private thaw = () => {
+    if (!this.frozen) return;
+    const c = this.canvas;
+    c.style.top = ""; c.style.left = ""; c.style.width = "100%"; c.style.height = "100%";
+    c.style.position = "fixed"; c.style.inset = "0";
+    this.frozen = false;
+    if (this.resizeWhileFrozen) { this.resizeWhileFrozen = false; this.applyResize(); }
+    this.last = 0;
+    if (!document.hidden && !this.raf) this.raf = requestAnimationFrame(this.frame);
   };
 
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
@@ -410,6 +466,7 @@ export class PlasmaRenderer {
   };
 
   private applyResize = () => {
+    if (this.frozen) { this.resizeWhileFrozen = true; return; }
     const gl = this.gl;
     let dpr = Math.min(devicePixelRatio || 1, this.settings.quality);
     const pixels = innerWidth * innerHeight * dpr * dpr;
@@ -570,6 +627,7 @@ export class PlasmaRenderer {
       r.drawn = { l, t, w: rgt - l, h: btm - t };
     });
 
+    this.drawnScroll = [scrollX, scrollY];
     this.draw(list.slice(0, this.max));
   };
 
@@ -605,7 +663,7 @@ export class PlasmaRenderer {
       gl.uniform1f(u.uMouseAmt, this.mouse.amt);
       gl.uniform1f(u.uDropR, s.pointerDrop ? 15 : 0);
       gl.uniform1f(u.uAmbient, s.ambientDrops ? 1 : 0);
-      gl.uniform1f(u.uScroll, scrollY * 0.25);
+      gl.uniform1f(u.uScroll, scrollY * (this.coarse && s.freezeOnScroll ? 1 : 0.25));
       gl.uniform1f(u.uVisc, Math.min(Math.max(s.viscosity, 0), 1));
       gl.uniform1f(u.uFlow, Math.max(s.flow, 0));
       gl.uniform2f(u.uMouse, this.mouse.x, this.mouse.y);

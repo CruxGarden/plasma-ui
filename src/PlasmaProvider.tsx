@@ -54,6 +54,13 @@ export interface PlasmaProviderProps {
   magnet?: number;
   /** Maximum device pixel ratio for the canvas. Default 1.25. */
   quality?: number;
+  /**
+   * Touch devices only: during a fling, pin the last drawn frame to the page
+   * and pause, so the compositor scrolls it with the content; resume when the
+   * scrolling stops. Off by default. Needs the canvas's positioned ancestor,
+   * if any, to scroll with the page.
+   */
+  freezeOnScroll?: boolean;
   /** Maximum visible plasma surfaces. Compiled into the shaders, so it is fixed for the provider's lifetime; more surfaces cost GPU time. Default 16. */
   maxSurfaces?: number;
   /** z-index of the fixed canvas. Default -1 (behind content). */
@@ -113,6 +120,7 @@ export function PlasmaProvider({
   children, mood = "tidal", theme = "auto", blend, refraction = 1, dispersion = 1, rim = 1, smoothness = 1,
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
   pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
+  freezeOnScroll = false,
 }: PlasmaProviderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [renderer, setRenderer] = useState<PlasmaRenderer | null>(null);
@@ -122,7 +130,7 @@ export function PlasmaProvider({
 
   const settings: RendererSettings = {
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
-    pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, tint, opacity,
+    pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
     rimColor, rimWidth, highlight, edgeLine, viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };
   const settingsRef = useRef(settings);
@@ -137,7 +145,7 @@ export function PlasmaProvider({
 
   useEffect(() => { renderer?.configure(settings); }, [
     renderer, m.colors.join(), settings.blend, refraction, dispersion, rim, smoothness,
-    settings.pointerDrop, ambientDrops, theme, quality, reducedMotion, tint, opacity,
+    settings.pointerDrop, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
     rimColor, rimWidth, highlight, edgeLine, viscosity, stretch, flow, frost, elevation, background,
   ]);
 
