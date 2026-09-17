@@ -558,7 +558,10 @@ export class PlasmaRenderer {
     this.recs.forEach(r => {
       if (!r.el.isConnected) return;
       if (!s.reducedMotion) {
-        r.formV += (170 * (1 - r.form) - 12 * r.formV) * dt;
+        // Critically damped: surfaces form in without overshooting. At the
+        // old damping of 12 they went 17.6% past full size and rang back,
+        // which read as a bounce on first paint.
+        r.formV += (170 * (1 - r.form) - 26 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
       const b = elementBox(r.el);
