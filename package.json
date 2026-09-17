@@ -1,6 +1,6 @@
 {
   "name": "@cruxgarden/plasma-ui",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Liquid panels for React: every panel is one shared plasma - they fuse on contact, refract, and snap to a grid.",
   "main": "dist/index.js",
   "scripts": {
