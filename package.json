@@ -1,0 +1,73 @@
+{
+  "name": "@cruxgarden/plasma-ui",
+  "version": "0.1.0",
+  "description": "A liquid glass workspace for React: panels share one WebGL material - they fuse on contact, refract, and snap to a grid.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --format=esm --jsx=automatic --target=es2020 --external:react --external:react-dom --outfile=dist/index.js && tsc",
+    "build:site": "node site/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write .",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "publish:patch": "npm version patch && npm publish && git push && git push --tags",
+    "publish:minor": "npm version minor && npm publish && git push && git push --tags",
+    "publish:major": "npm version major && npm publish && git push && git push --tags"
+  },
+  "author": {
+    "name": "Crux Garden",
+    "url": "https://github.com/cruxgarden"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.25.12",
+    "prettier": "^3.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.9.3"
+  },
+  "type": "module",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "keywords": [
+    "react",
+    "webgl",
+    "glass",
+    "ui",
+    "animation"
+  ],
+  "homepage": "https://github.com/cruxgarden/plasma-ui#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cruxgarden/plasma-ui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cruxgarden/plasma-ui/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
