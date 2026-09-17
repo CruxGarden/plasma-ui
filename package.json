@@ -13,7 +13,9 @@
     "verify": "npm run typecheck && npm test && npm run build",
     "publish:patch": "npm version patch && npm publish && git push && git push --tags",
     "publish:minor": "npm version minor && npm publish && git push && git push --tags",
-    "publish:major": "npm version major && npm publish && git push && git push --tags"
+    "publish:major": "npm version major && npm publish && git push && git push --tags",
+    "build:example": "node examples/workspace/build.mjs",
+    "build:pages": "node scripts/build-pages.mjs"
   },
   "author": {
     "name": "Crux Garden",
@@ -56,7 +58,7 @@
     "ui",
     "animation"
   ],
-  "homepage": "https://github.com/cruxgarden/plasma-ui#readme",
+  "homepage": "https://cruxgarden.github.io/plasma-ui/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cruxgarden/plasma-ui.git"

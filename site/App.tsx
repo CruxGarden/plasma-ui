@@ -108,7 +108,7 @@ function Nav({ config, apply }: { config: string | null; apply: (name: string) =
         <a href="#how">How it works</a>
         <a href="#playground">Playground</a>
         <a href="#api">API</a>
-        <a href="https://claude.ai/artifact/5oS64oTYJZbaFMVZfuCFTH" target="_blank" rel="noreferrer">Example app</a>
+        <a href="examples/workspace/" target="_blank" rel="noreferrer">Example app</a>
       </div>
       <div className="seg" role="group" aria-label="Configuration">
         {CONFIGS.map(c => (
