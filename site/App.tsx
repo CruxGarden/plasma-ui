@@ -374,8 +374,9 @@ function Hero() {
         <Plasma className="hero-title" radius={36}>
           <h1>Plasma UI</h1>
           <p className="lede">
-            Liquid panels for React. Every panel is one shared plasma: they fuse
-            on contact, refract what's behind them, and snap to a grid.
+            Liquid panels for React, rendered in WebGL on canvas. Every panel is
+            one shared plasma: they fuse on contact, refract what's behind them,
+            and snap to a grid.
           </p>
           <div className="row">
             <a className="btn primary" href="#playground">

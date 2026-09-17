@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.1
+
+Fixes for the reports that came in after 0.2.0, and one new option.
+
+- **Fixed:** the spring integrator diverged at small `stretch` with low
+  `viscosity` - stiffness grows as 1/stretch², and at the fixed substep
+  explicit Euler blew up, so the surface oscillated instead of settling. The
+  substep now follows the spring. Reachable from the playground: `stretch`
+  0.1 or 0.2 hit it.
+- **Fixed:** lean rewrote `translate` on every panel every frame, forcing a
+  layout each frame. It now settles and writes only on change.
+- **Fixed:** every `resize` event reallocated all render targets; a mobile
+  URL bar collapsing fired dozens per second. Coalesced to one per frame and
+  skipped when the pixel size is unchanged.
+- **New:** `freezeOnScroll` on `PlasmaProvider` (off by default). On touch
+  devices, a fling pins a three-viewport frame to the page and pauses, so the
+  compositor scrolls it with the content; rendering resumes when the scroll
+  stops. Pinned frames match live ones to within one level.
+- Passes that have nothing to do are skipped: the tint blur when no surface
+  has opacity, the frost blur when nothing is frosted or elevated, a copy
+  pass in the background chain. The loop pauses in a hidden tab. The
+  background target is 8-bit. Together, 20-40% fewer passes on clear looks;
+  pixel-identical output.
+- The canvas is capped at 2.6M pixels, trading resolution rather than frame
+  rate on 4K displays and dense phones.
+
 ## 0.2.0
 
 **Breaking:** the CSS class on every surface is `.plasma-panel`, was `.plasma-glass`.

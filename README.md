@@ -1,6 +1,6 @@
 # Plasma UI
 
-Liquid panels for React, inspired by Apple's Liquid Glass design. The `<Plasma>` panel looks and behaves like liquid, with surface tension that fuses on contact with other panels. Anything visible behind the panel is refracted. And for layout convenience, the panels ultimately snap to a grid layout. The library is a work in progress, extracted from the [Crux Garden](https://github.com/cruxgarden) project, but it seemed useful enough to share in it's current form.
+Liquid panels for React, rendered in WebGL on canvas, inspired by Apple's Liquid Glass design. The `<Plasma>` panel looks and behaves like liquid, with surface tension that fuses on contact with other panels. Anything visible behind the panel is refracted. And for layout convenience, the panels ultimately snap to a grid layout. The library is a work in progress, extracted from the [Crux Garden](https://github.com/cruxgarden) project, but it seemed useful enough to share in its current form.
 
 ![Five panels in a workspace: one is dragged out of its group and travels as liquid, another is dropped against a neighbour and fuses into it, and each snaps to the 24px grid](docs/demo.gif)
 
