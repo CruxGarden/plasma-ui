@@ -93,7 +93,7 @@ export function App() {
         <Playground s={s} set={set} reset={() => { setS(DEFAULTS); setConfig("Lumen"); }} />
         <Api />
         <Limitations />
-        <footer className="footer">Plasma UI 0.1 · MIT license · a <a href="https://github.com/cruxgarden">Crux Garden</a> project</footer>
+        <footer className="footer">Plasma UI 0.1 · MIT license · a <a href="https://crux.garden">Crux Garden</a> project</footer>
       </main>
     </PlasmaProvider>
   );
