@@ -38,7 +38,7 @@ section { margin-top: 140px; }
 /* nav */
 .nav {
   position: fixed; top: 16px; left: max(16px, calc(50% - 520px)); z-index: 10;
-  width: min(1040px, calc(100vw - 32px)); display: flex; align-items: center; gap: 20px; padding: 10px 10px 10px 22px;
+  width: min(1040px, calc(100vw - 32px)); display: flex; align-items: center; gap: 20px; padding: 10px 20px 10px 22px;
   border-radius: 30px;
 }
 .nav.plasma-fallback { background: linear-gradient(160deg, rgb(20 40 52 / .72), rgb(10 22 30 / .6)); }
