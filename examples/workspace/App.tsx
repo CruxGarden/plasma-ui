@@ -81,7 +81,7 @@ export function App() {
   const mail = MAIL.find(m => m.id === mailId)!;
 
   return (
-    <PlasmaProvider mood={mood} frost={frost} blend={20} grid={24}>
+    <PlasmaProvider mood={mood} theme="dark" frost={frost} blend={20} grid={24}>
       <div className="app">
         <Plasma as="header" className="bar" radius={22} lean={false} padding={18} elevation={0.5} fuse={false}>
           <div className="plate row">

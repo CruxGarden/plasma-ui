@@ -38,7 +38,10 @@ interface Settings {
 }
 const DEFAULTS: Settings = {
   mood: "tidal",
-  theme: "auto",
+  // Dark, not the device's preference. The light theme washes the mood field
+  // with 58% white, and the colour is the point of the page. The theme control
+  // below still offers auto and light - this is only where it starts.
+  theme: "dark",
   blend: 40,
   refraction: 1,
   dispersion: 1,
