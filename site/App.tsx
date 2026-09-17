@@ -102,9 +102,6 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
     blurb: "Frosted workspace. Calm motion, quiet edges.",
     patch: {
       mood: "tidal",
-      // Dark panels need the dark theme with them: the page's text colours key
-      // off it, and near-black type on a black panel is unreadable.
-      theme: "dark",
       tint: "#000000",
       // A black tint has to carry far more weight than the white one did: at
       // 8% it just greyed the mood field instead of reading as a dark panel.
@@ -132,9 +129,6 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
     blurb: "Opaque panels, no shine. Reads as a plain app.",
     patch: {
       mood: "tidal",
-      // Opaque dark panel: without the dark theme the page keeps its
-      // light type colours and the copy sits near-black on near-black.
-      theme: "dark",
       tint: "#1c2733",
       opacity: 1,
       frost: 0,
@@ -161,9 +155,6 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
     blurb: "Dark tinted panels, colored rims, fast and springy.",
     patch: {
       mood: "ember",
-      // Opaque dark panel: without the dark theme the page keeps its
-      // light type colours and the copy sits near-black on near-black.
-      theme: "dark",
       tint: "#160b1e",
       opacity: 0.75,
       frost: 0.2,
@@ -250,9 +241,7 @@ export function App() {
     const c = CONFIGS.find((c) => c.name === name);
     if (!c) return;
     setConfig(name);
-    // Theme resets unless the preset names one: Studio is the only dark look,
-    // and without this its dark theme stuck to whichever preset came next.
-    setS((p) => ({ ...p, theme: DEFAULTS.theme, ...c.patch }));
+    setS((p) => ({ ...p, ...c.patch }));
   };
 
   useEffect(() => {
@@ -651,12 +640,6 @@ function Playground({
               value={s.mood}
               options={Object.keys(moods)}
               onChange={(v) => set("mood", v as MoodName)}
-            />
-            <Select
-              label="Theme"
-              value={s.theme}
-              options={["auto", "dark", "light"]}
-              onChange={(v) => set("theme", v as Theme)}
             />
             <div className="field inline">
               <label className="flabel" htmlFor="tint">
