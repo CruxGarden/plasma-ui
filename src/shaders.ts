@@ -12,7 +12,7 @@ export interface ShaderSet { maskFrag: string; tintFrag: string; blurFrag: strin
 export function makeShaders(MAX_SHAPES: number): ShaderSet {
 const common = `
 precision highp float;
-uniform vec2 uRes; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uAmbient, uScroll, uVisc, uFlow;
+uniform vec2 uRes; uniform vec4 uView; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uAmbient, uScroll, uVisc, uFlow;
 uniform vec2 uMouse;
 uniform vec4 uP[${MAX_SHAPES}]; uniform vec4 uR[${MAX_SHAPES}]; uniform float uF[${MAX_SHAPES}]; uniform vec4 uT[${MAX_SHAPES}]; uniform float uFr[${MAX_SHAPES}]; uniform float uEl[${MAX_SHAPES}]; uniform float uSolo[${MAX_SHAPES}];
 uniform int uCount;
@@ -64,7 +64,7 @@ float scene(vec2 p){
   d = min(d, ds);
   if(uAmbient > .5){
     float t = uTime*.4;
-    vec2 home = vec2(uRes.x*.88, uRes.y*.74);
+    vec2 home = uView.xy + vec2(uView.z*.88, uView.w*.74);
     d = smin(d, length(p - home - vec2(cos(t),sin(t*1.3))*70.) - 38., uGoo);
     d = smin(d, length(p - home - vec2(cos(t*1.7+2.),sin(t*.9+1.))*90.) - 26., uGoo);
     d = smin(d, length(p - home - vec2(sin(t*.7),cos(t*1.1))*40.) - 20., uGoo);
@@ -154,7 +154,7 @@ vec3 bg(vec2 p){
   col = mix(col, uC, smoothstep(.55,.9, w.x*n*1.6));
   float lines = abs(fract(n*14.)-.5);
   col += (1.-smoothstep(0.,.06,lines)) * .07 * (0.6+uEnergy);
-  vec2 v = (p - vec2(0., uScroll))/uRes - .5;
+  vec2 v = (p - vec2(0., uScroll) - uView.xy)/uView.zw - .5;
   col *= .55 + .45*smoothstep(1.2,.2,length(v));
   return mix(col, mix(vec3(.90,.93,.95), col, .42), uLight);
 }
@@ -183,8 +183,8 @@ void main(){
         + vec2(fbm(q*.004 + uTime*.05) - .5, fbm(q*.004 + 31.7 - uTime*.04) - .5) * 22.)
         * (.5 + uFlow*.5);
     // cover-fit the image to the canvas
-    float sc = max(uRes.x / uImgRes.x, uRes.y / uImgRes.y);
-    vec2 uv = (q - .5*uRes) / (uImgRes * sc) + .5;
+    float sc = max(uView.z / uImgRes.x, uView.w / uImgRes.y);
+    vec2 uv = (q - uView.xy - .5*uView.zw) / (uImgRes * sc) + .5;
     o = vec4(texture(uImg, clamp(uv, 0., 1.)).rgb, 1.);
     return;
   }
@@ -249,7 +249,10 @@ void main(){
   float shStr = .5 * smoothstep(0., .12, el) * clamp(el + .35, 0., 1.);
   vec3 col = back * (1. - shStr*smoothstep(.02, .55, hs)*(1.-uLight*.6));
   float hHere = H(uv);
-  col += pal(uTime*.03 + p.x/1400.) * .06 * smoothstep(.0, .45, hHere) * (1.+uEnergy);
+  // Palette phases run on viewport position, like the grain: a frame drawn for
+  // a taller region must colour its viewport band exactly as the live frame does.
+  vec2 vp = p - uView.xy;
+  col += pal(uTime*.03 + vp.x/1400.) * .06 * smoothstep(.0, .45, hHere) * (1.+uEnergy);
 
   if(sd > -2.){
     vec2 th = 2. / vec2(textureSize(uH, 0));
@@ -294,7 +297,7 @@ void main(){
     plasma += rimCol * fres * .45 * hl * uRim;
     plasma += vec3(1.) * spec * .75 * hl * uSpec;
     // faint shimmer across the body; fades out as the tint becomes opaque
-    plasma += pal(uTime*.04 + p.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha);
+    plasma += pal(uTime*.04 + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha);
     vec3 hairCol = uRimMode > .5 ? mix(vec3(1.), rimCol / 1.4, .6) : vec3(.9,.95,1.);
     plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
 
@@ -302,7 +305,9 @@ void main(){
     col = mix(col, plasma, a);
     grain = 1. - a;   // grain is background-only; panels stay clean
   }
-  col += (hash(p + uTime) - .5) * .025 * grain;
+  // Keyed on viewport position, so a frame drawn for a taller region has the
+  // same grain in its viewport band as the live frame that replaces it.
+  col += (hash(p - uView.xy + uTime) - .5) * .025 * grain;
   o = vec4(col, 1.);
 }`;
 

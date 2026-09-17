@@ -104,7 +104,7 @@ interface Rec extends ShapeOptions {
 type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> };
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
-const UNIFORMS = ["uRes", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
+const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
   "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
@@ -195,6 +195,14 @@ export class PlasmaRenderer {
   private resizeWhileFrozen = false;
   /** Scroll offset the last frame was drawn for: where the pinned image belongs on the page. */
   private drawnScroll = [0, 0];
+  /**
+   * The region a frame covers, in CSS px: origin is where the viewport's
+   * top-left sits inside it, size is the whole region. Normally the viewport
+   * exactly. When pinning for a fling it is three viewports tall, so the
+   * scroll has a viewport of runway above and below before it runs out.
+   */
+  private region = { ox: 0, oy: 0, w: 0, h: 0 };
+  private static readonly RUNWAY = 1; // viewports of runway above and below when pinned
   private energy = 0;
   private mouse = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
   private pulses: number[][] = Array.from({ length: MAX_PULSES }, () => [0, 0, -99, 0]);
@@ -426,13 +434,20 @@ export class PlasmaRenderer {
   private freeze() {
     const c = this.canvas;
     cancelAnimationFrame(this.raf); this.raf = 0;
+    // One frame covering three viewports, the current one in the middle, so
+    // the fling has a viewport of runway each way. It is drawn for the scroll
+    // offset of this moment, and pinned there.
+    const vw = innerWidth, vh = innerHeight, runway = Math.round(vh * PlasmaRenderer.RUNWAY);
+    this.region = { ox: 0, oy: runway, w: vw, h: vh + 2 * runway };
+    this.allocate();
+    this.oneShot = true; this.frame(performance.now()); this.oneShot = false;
     // Absolute, sized in pixels so a positioned ancestor cannot stretch it,
-    // then offset so it sits exactly where the fixed canvas was a moment ago.
+    // then offset so the viewport band of the image sits on the viewport.
     c.style.inset = "";
-    c.style.width = `${innerWidth}px`; c.style.height = `${innerHeight}px`;
+    c.style.width = `${this.region.w}px`; c.style.height = `${this.region.h}px`;
     c.style.position = "absolute"; c.style.top = "0px"; c.style.left = "0px";
     const r = c.getBoundingClientRect();
-    c.style.top = `${-r.top - (scrollY - this.drawnScroll[1])}px`;
+    c.style.top = `${-r.top - (scrollY - this.drawnScroll[1]) - runway}px`;
     c.style.left = `${-r.left - (scrollX - this.drawnScroll[0])}px`;
     this.frozen = true;
   }
@@ -443,7 +458,8 @@ export class PlasmaRenderer {
     c.style.top = ""; c.style.left = ""; c.style.width = "100%"; c.style.height = "100%";
     c.style.position = "fixed"; c.style.inset = "0";
     this.frozen = false;
-    if (this.resizeWhileFrozen) { this.resizeWhileFrozen = false; this.applyResize(); }
+    this.resizeWhileFrozen = false;
+    this.applyResize(); // back to the viewport region, which also picks up any resize that arrived meanwhile
     this.last = 0;
     if (!document.hidden && !this.raf) this.raf = requestAnimationFrame(this.frame);
   };
@@ -467,13 +483,20 @@ export class PlasmaRenderer {
 
   private applyResize = () => {
     if (this.frozen) { this.resizeWhileFrozen = true; return; }
+    this.region = { ox: 0, oy: 0, w: innerWidth, h: innerHeight };
+    this.allocate();
+  };
+
+  /** Size the canvas and every target for the current region. */
+  private allocate = () => {
     const gl = this.gl;
+    const { w: rw, h: rh } = this.region;
     let dpr = Math.min(devicePixelRatio || 1, this.settings.quality);
-    const pixels = innerWidth * innerHeight * dpr * dpr;
+    const pixels = rw * rh * dpr * dpr;
     if (pixels > MAX_PIXELS) dpr *= Math.sqrt(MAX_PIXELS / pixels);
     this.dpr = dpr;
-    const cw = Math.max(1, Math.round(innerWidth * this.dpr));
-    const ch = Math.max(1, Math.round(innerHeight * this.dpr));
+    const cw = Math.max(1, Math.round(rw * this.dpr));
+    const ch = Math.max(1, Math.round(rh * this.dpr));
     // Nothing to do when the pixel size is unchanged, which is most of the
     // resize events a mobile browser sends.
     if (cw === this.canvas.width && ch === this.canvas.height) return;
@@ -511,7 +534,7 @@ export class PlasmaRenderer {
   }
 
   private frame = (now: number) => {
-    this.raf = requestAnimationFrame(this.frame);
+    if (!this.oneShot) this.raf = requestAnimationFrame(this.frame);
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0.016;
     this.last = now;
     const s = this.settings;
@@ -527,7 +550,10 @@ export class PlasmaRenderer {
     this.energy *= Math.exp(-dt * 1.2);
 
     // per-shape: form spring, visibility, join state, lean, pulse
-    const vw = innerWidth, vh = innerHeight;
+    // Region bounds in viewport coordinates: the viewport itself, plus runway
+    // above and below while a pinned frame is being drawn.
+    const rg = this.region;
+    const top = -rg.oy - 80, bottom = rg.h - rg.oy + 80, left = -rg.ox - 80, right = rg.w - rg.ox + 80;
     const list: Rec[] = [];
     this.recs.forEach(r => {
       if (!r.el.isConnected) return;
@@ -537,7 +563,7 @@ export class PlasmaRenderer {
       } else r.form = 1;
       const b = elementBox(r.el);
       r.box = b;
-      if (b.w === 0 || b.l > vw + 80 || b.t > vh + 80 || b.l + b.w < -80 || b.t + b.h < -80) { r.sp.live = false; return; }
+      if (b.w === 0 || b.l > right || b.t > bottom || b.l + b.w < left || b.t + b.h < top) { r.sp.live = false; return; }
       list.push(r);
     });
 
@@ -628,15 +654,18 @@ export class PlasmaRenderer {
     });
 
     this.drawnScroll = [scrollX, scrollY];
-    this.draw(list.slice(0, this.max));
+    this.lastList = list.slice(0, this.max);
+    this.draw(this.lastList);
   };
+  private lastList: Rec[] = [];
+  private oneShot = false;
 
   private draw(list: Rec[]) {
-    const gl = this.gl, s = this.settings;
+    const gl = this.gl, s = this.settings, rg = this.region;
     const drawn = list.map(r => r.drawn ?? elementBox(r.el));
     list.forEach((r, i) => {
       const b = drawn[i];
-      this.P.set([b.l + b.w / 2, b.t + b.h / 2, b.w / 2, b.h / 2], i * 4);
+      this.P.set([b.l + b.w / 2 + rg.ox, b.t + b.h / 2 + rg.oy, b.w / 2, b.h / 2], i * 4);
       // fuse={false} surfaces neither square others' corners nor get squared
       const squareAgainst = r.fuse === false ? [] : drawn.filter((_, j) => j !== i && list[j].fuse !== false);
       this.R.set(cornerRadii(b, r.radius, squareAgainst, -1), i * 4);
@@ -651,10 +680,11 @@ export class PlasmaRenderer {
       this.EL[i] = r.elevNow;
       this.SOLO[i] = r.fuse === false ? 1 : 0;
     });
-    this.pulses.forEach((p, i) => this.RP.set(p, i * 4));
+    this.pulses.forEach((p, i) => this.RP.set([p[0] + rg.ox, p[1] + rg.oy, p[2], p[3]], i * 4));
     const light = this.isLight() ? 1 : 0;
     const setCommon = (u: Prog["u"], scale: number) => {
-      gl.uniform2f(u.uRes, innerWidth, innerHeight);
+      gl.uniform2f(u.uRes, rg.w, rg.h);
+      gl.uniform4f(u.uView, rg.ox, rg.oy, innerWidth, innerHeight);
       gl.uniform1f(u.uScale, scale);
       gl.uniform1f(u.uTime, this.time);
       gl.uniform1f(u.uGoo, this.blend);
@@ -663,10 +693,12 @@ export class PlasmaRenderer {
       gl.uniform1f(u.uMouseAmt, this.mouse.amt);
       gl.uniform1f(u.uDropR, s.pointerDrop ? 15 : 0);
       gl.uniform1f(u.uAmbient, s.ambientDrops ? 1 : 0);
-      gl.uniform1f(u.uScroll, scrollY * (this.coarse && s.freezeOnScroll ? 1 : 0.25));
+      // 1:1 where pinning is on, so the pinned image and the next live frame
+      // agree; the region origin keeps the field continuous across the runway.
+      gl.uniform1f(u.uScroll, this.coarse && s.freezeOnScroll ? scrollY - rg.oy : scrollY * 0.25);
       gl.uniform1f(u.uVisc, Math.min(Math.max(s.viscosity, 0), 1));
       gl.uniform1f(u.uFlow, Math.max(s.flow, 0));
-      gl.uniform2f(u.uMouse, this.mouse.x, this.mouse.y);
+      gl.uniform2f(u.uMouse, this.mouse.x + rg.ox, this.mouse.y + rg.oy);
       gl.uniform4fv(u.uP, this.P); gl.uniform4fv(u.uR, this.R); gl.uniform1fv(u.uF, this.F); gl.uniform4fv(u.uT, this.T); gl.uniform1fv(u.uFr, this.FR); gl.uniform1fv(u.uEl, this.EL); gl.uniform1fv(u.uSolo, this.SOLO);
       gl.uniform1i(u.uCount, list.length);
       gl.uniform4fv(u.uRip, this.RP);
