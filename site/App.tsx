@@ -99,8 +99,13 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
     blurb: "Frosted workspace. Calm motion, quiet edges.",
     patch: {
       mood: "tidal",
-      tint: "#ffffff",
-      opacity: 0.08,
+      // Dark panels need the dark theme with them: the page's text colours key
+      // off it, and near-black type on a black panel is unreadable.
+      theme: "dark",
+      tint: "#000000",
+      // A black tint has to carry far more weight than the white one did: at
+      // 8% it just greyed the mood field instead of reading as a dark panel.
+      opacity: 0.55,
       frost: 0.85,
       panelColors: false,
       rimStyle: "iridescent",
@@ -236,7 +241,9 @@ export function App() {
     const c = CONFIGS.find((c) => c.name === name);
     if (!c) return;
     setConfig(name);
-    setS((p) => ({ ...p, ...c.patch }));
+    // Theme resets unless the preset names one: Studio is the only dark look,
+    // and without this its dark theme stuck to whichever preset came next.
+    setS((p) => ({ ...p, theme: DEFAULTS.theme, ...c.patch }));
   };
 
   useEffect(() => {
