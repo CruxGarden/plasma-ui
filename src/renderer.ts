@@ -78,6 +78,8 @@ interface Rec extends ShapeOptions {
   el: HTMLElement;
   form: number; formV: number; removing: boolean;
   lx: number; ly: number;
+  /** Last translate written, so an unchanged frame writes nothing. */
+  leanCss: string;
   joined: boolean; dragging: boolean;
   layoutBox: (() => Box) | null;
   pulseAt: number; pulseS: number;
@@ -97,6 +99,10 @@ type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 const UNIFORMS = ["uRes", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
   "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair"];
 const MASK_SCALE = 0.5;
+// Every pass is full-viewport, so cost scales with the canvas. Past this many
+// pixels the resolution drops rather than the frame rate: a 4K monitor or a
+// tall phone at devicePixelRatio 3 asks for far more than the effect needs.
+const MAX_PIXELS = 2_600_000;
 
 /** Visible box of an element with the centered pulse scale removed. */
 function elementBox(el: HTMLElement): Box {
@@ -173,6 +179,7 @@ export class PlasmaRenderer {
   private last = 0;
   private time = 0;
   private dpr = 1;
+  private resizeQueued = false;
   private energy = 0;
   private mouse = { x: 0, y: 0, tx: 0, ty: 0, amt: 0, target: 0 };
   private pulses: number[][] = Array.from({ length: MAX_PULSES }, () => [0, 0, -99, 0]);
@@ -227,7 +234,7 @@ export class PlasmaRenderer {
     addEventListener("resize", this.resize);
     addEventListener("pointermove", this.onPointer, { passive: true });
     document.addEventListener("pointerleave", this.onLeave);
-    this.resize();
+    this.applyResize();
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -305,7 +312,7 @@ export class PlasmaRenderer {
     const id = this.nextId++;
     const rec: Rec = {
       id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false,
-      lx: 0, ly: 0, joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
+      lx: 0, ly: 0, leanCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
     this.recs.set(id, rec);
@@ -366,11 +373,33 @@ export class PlasmaRenderer {
   private onPointer = (e: PointerEvent) => { this.mouse.tx = e.clientX; this.mouse.ty = e.clientY; this.mouse.target = 1; };
   private onLeave = () => { this.mouse.target = 0; };
 
+  /**
+   * Resizing reallocates eight render targets, so it must not run per event.
+   * Mobile fires `resize` continuously while the URL bar collapses, which
+   * otherwise reallocated every texture repeatedly mid-scroll.
+   */
   private resize = () => {
+    if (this.resizeQueued) return;
+    this.resizeQueued = true;
+    requestAnimationFrame(() => {
+      this.resizeQueued = false;
+      this.applyResize();
+    });
+  };
+
+  private applyResize = () => {
     const gl = this.gl;
-    this.dpr = Math.min(devicePixelRatio || 1, this.settings.quality);
-    this.canvas.width = Math.max(1, Math.round(innerWidth * this.dpr));
-    this.canvas.height = Math.max(1, Math.round(innerHeight * this.dpr));
+    let dpr = Math.min(devicePixelRatio || 1, this.settings.quality);
+    const pixels = innerWidth * innerHeight * dpr * dpr;
+    if (pixels > MAX_PIXELS) dpr *= Math.sqrt(MAX_PIXELS / pixels);
+    this.dpr = dpr;
+    const cw = Math.max(1, Math.round(innerWidth * this.dpr));
+    const ch = Math.max(1, Math.round(innerHeight * this.dpr));
+    // Nothing to do when the pixel size is unchanged, which is most of the
+    // resize events a mobile browser sends.
+    if (cw === this.canvas.width && ch === this.canvas.height) return;
+    this.canvas.width = cw;
+    this.canvas.height = ch;
     const w = Math.max(1, Math.round(this.canvas.width * MASK_SCALE));
     const h = Math.max(1, Math.round(this.canvas.height * MASK_SCALE));
     const size = (t: Target, tw: number, th: number) => {
@@ -463,7 +492,15 @@ export class PlasmaRenderer {
       }
       const le = 1 - Math.exp(-dt * 3);
       r.lx += (tx - r.lx) * le; r.ly += (ty - r.ly) * le;
-      r.el.style.translate = `${r.lx.toFixed(2)}px ${r.ly.toFixed(2)}px`;
+      // Lean eases asymptotically, so it never quite stops changing. Writing
+      // it every frame dirtied layout for every panel every frame, and the
+      // getBoundingClientRect below then forced a reflow to resolve it.
+      // Below a twentieth of a pixel there is nothing to see, so settle.
+      if (Math.abs(tx - r.lx) < 0.05 && Math.abs(ty - r.ly) < 0.05) { r.lx = tx; r.ly = ty; }
+      const lean = tx === 0 && ty === 0 && r.lx === 0 && r.ly === 0
+        ? ""
+        : `${r.lx.toFixed(2)}px ${r.ly.toFixed(2)}px`;
+      if (lean !== r.leanCss) { r.leanCss = lean; r.el.style.translate = lean; }
 
       const u = (this.time - r.pulseAt) / 0.36;
       if (r.pulseAt >= 0 && u >= 0 && u <= 1 && !s.reducedMotion) r.el.style.scale = String(1 + 0.04 * r.pulseS * Math.sin(Math.PI * u));
@@ -480,7 +517,13 @@ export class PlasmaRenderer {
     const zeta = 0.28 + 0.87 * v;
     const damp = 2 * zeta * Math.sqrt(stiff);
     const sx = scrollX, sy = scrollY;
-    const steps = Math.max(1, Math.ceil(dt * 120));
+    // The substep has to satisfy the spring, not just the frame rate. stiff
+    // grows as 1/stretch^2, so a small stretch with low viscosity pushes
+    // stiff past two million: at a fixed 1/120s step, explicit Euler diverges
+    // and the surface visibly oscillates instead of settling. Keeping
+    // h well inside 1/omega holds it stable at every slider position.
+    const hMax = 0.2 / Math.sqrt(Math.max(stiff, 1e-6));
+    const steps = Math.min(240, Math.max(Math.ceil(dt * 120), Math.ceil(dt / hMax), 1));
     const h = dt / steps;
     list.forEach(r => {
       const rr = r.el.getBoundingClientRect(); // includes pulse scale and lean
