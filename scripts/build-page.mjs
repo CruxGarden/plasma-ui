@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 
 const FONTS =
-  "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500&family=JetBrains+Mono&family=Onest:wght@400;500&display=swap";
+  "https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500&family=Cormorant+Garamond:wght@500;600&family=JetBrains+Mono&family=Onest:wght@400;500&display=swap";
 
 /**
  * @param {object} page
