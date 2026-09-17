@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0
+
+**Breaking:** the CSS class on every surface is `.plasma-panel`, was `.plasma-glass`.
+Only matters if you targeted it in your own stylesheet.
+
+- The material is called plasma throughout: prop descriptions, docs, and the
+  shader's own names. "Glass" is gone except where the readme credits Apple's
+  Liquid Glass as prior art.
+- `homepage` points at the site rather than the readme.
+
+## 0.1.2
+
+- Packaging and metadata only; no runtime change.
+
 ## 0.1.0
 
 Initial release.
