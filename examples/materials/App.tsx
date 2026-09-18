@@ -132,7 +132,7 @@ const SHAPE: Record<
   plasma: { radius: 26, edge: 0, edgeScale: 0.01, sharp: 0 },
   crystal: { radius: 10, edge: 3, edgeScale: 0.05, sharp: 1 },
   metal: { radius: 3, edge: 0, edgeScale: 0.01, sharp: 0 },
-  mercury: { radius: 44, edge: 2, edgeScale: 0.004, sharp: 0 },
+  mercury: { radius: 26, edge: 2, edgeScale: 0.004, sharp: 0 },
   wood: { radius: 5, edge: 1.5, edgeScale: 0.02, sharp: 0.3 },
   stone: { radius: 8, edge: 7, edgeScale: 0.03, sharp: 0.85 },
   cloud: { radius: 40, edge: 26, edgeScale: 0.005, sharp: 0 },
@@ -229,66 +229,20 @@ export function App() {
         </Plasma>
 
         <div className="body">
-          <Plasma
-            className="card lead"
-            radius={shape.radius}
-            padding={22}
-            lean={false}
-          >
-            <div className="plate">
-              <h2>{material}</h2>
-              <p className="blurb">{note.blurb}</p>
-              <p className="technique">{note.technique}</p>
-            </div>
-          </Plasma>
-
+          {/* Bare panels. Content comes back once the material itself is
+              right — anything on top is something to look at instead of it. */}
+          <Plasma className="card lead" radius={shape.radius} lean={false} />
           <div className="col">
-            <Plasma
-              className="card"
-              radius={shape.radius}
-              padding={18}
-              lean={false}
-            >
-              <div className="plate">
-                <h3>Legibility</h3>
-                <p>
-                  A plate inside the panel, which is how a busy material stays
-                  usable. The material is the frame; the content sits on it.
-                </p>
-              </div>
-            </Plasma>
-            <Plasma
-              className="card"
-              radius={shape.radius}
-              padding={18}
-              lean={false}
-            >
-              <div className="plate thin">
-                <h3>Bare</h3>
-                <p>
-                  The same text with no plate, so you can judge for yourself
-                  where each material stops being readable.
-                </p>
-              </div>
-            </Plasma>
+            <Plasma className="card" radius={shape.radius} lean={false} />
+            <Plasma className="card" radius={shape.radius} lean={false} />
           </div>
-
           <div className="col">
             <Plasma
               className="card tall"
               radius={shape.radius}
-              padding={18}
               draggable
               lean={false}
-            >
-              <div className="plate">
-                <h3>Drag me</h3>
-                <p>
-                  Springs, snapping and joins are the same code for every
-                  material — only the shading changed.
-                </p>
-              </div>
-            </Plasma>
+            />
           </div>
         </div>
 

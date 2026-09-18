@@ -51,10 +51,7 @@ float scene(vec2 p){
     if(f < .005) continue;
     vec2 c = uP[i].xy; vec2 h = uP[i].zw * f;
     float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
-    // Surface tension rounds the footprint here exactly as it does in map3,
-    // or the silhouette clips the solid and bites notches out of a bead.
-    vec4 rcT = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), uTension);
-    vec4 bx = sdBoxG(p-c, h, rcT, rmax);
+    vec4 bx = sdBoxG(p-c, h, min(uR[i], vec4(min(h.x, h.y))), rmax);
     if(uSolo[i] > .5){ ds = min(ds, bx.x); continue; }
     if(d > 1e3){ d = bx.x; g = bx.yz; sh = bx.w; continue; }
     // Blend only where surfaces face different ways (corners, gaps, steps);
@@ -113,8 +110,7 @@ void main(){
     if(uF[i] < .005) continue;
     vec2 h = uP[i].zw * uF[i];
     float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
-    vec4 rcT2 = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), uTension);
-    float d = sdBoxG(p - uP[i].xy, h, rcT2, rmax).x;
+    float d = sdBoxG(p - uP[i].xy, h, min(uR[i], vec4(min(h.x, h.y))), rmax).x;
     float w = exp(-max(d, 0.) / 18.) * (1. + smoothstep(0., -24., d) * 4.);
     acc += uT[i] * w; fr += uFr[i] * w; el += uEl[i] * w; wsum += w;
   }
@@ -309,19 +305,97 @@ float map3(vec3 q, float tension, float thick){
     vec2 c = uP[i].xy;
     vec2 h = uP[i].zw * f;
     float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
-    // Surface tension rounds the footprint: at full tension the corner radius
-    // reaches half the short side, so a small panel is a disc and a long one
-    // a stadium. That is the shape a bead wants, fighting the rectangle.
-    vec4 rc = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), tension);
-    float d2 = sdBoxG(q.xy - c, h, rc, rmax).x;
-    // Extrude, with the rim rolled over so the slab has a shoulder rather
-    // than a cut edge — a poured bead has no sharp corner anywhere.
-    float roll = thick * (.45 + .55 * tension);
+    // The footprint is the element's, exactly as plasma's is. Mercury is not
+    // a blob that swallows the layout — it is a panel, poured. Tension belongs
+    // to the edge and to the merge, not to the shape: pulling the whole
+    // footprint toward a disc threw the panel away and left content floating
+    // over nothing.
+    float d2 = sdBoxG(q.xy - c, h, min(uR[i], vec4(min(h.x, h.y))), rmax).x;
+    // Extrude, with the rim rolled over so the slab has a shoulder rather than
+    // a cut edge. Tension fattens that roll — where a bead of mercury reads as
+    // poured is its edge, not its outline.
+    float roll = thick * (.22 + .50 * tension);
     vec2 w = vec2(d2 + roll, abs(q.z) - (thick - roll));
     float de = min(max(w.x, w.y), 0.) + length(max(w, 0.)) - roll;
     d = (i == 0) ? de : smin(d, de, uGoo * (.6 + 1.8 * tension));
   }
+  // Two slow swells across the whole body, displacing the surface itself
+  // rather than tilting a normal — the march finds a moving surface, so the
+  // reflection travels over real waves. This is what separates water from a
+  // picture of water.
+  // Displacing a distance field costs it the property the march depends on:
+  // d is no longer a safe distance, so a full step overshoots the surface and
+  // the ray lands inside, which is the mottled crust this produced at first.
+  // The amplitude is kept small and the march below steps at a fraction, which
+  // is the standard price of displacement.
+  if (tension > .01) {
+    float wv = (fbm(q.xy * .0075 + vec2(uTime * .11, uTime * .06)) - .5) * 1.6
+             + (fbm(q.xy * .019 - vec2(uTime * .08, uTime * .13)) - .5) * .6;
+    d -= wv * thick * .07 * tension;
+  }
   return d;
+}
+
+// ── The gem ───────────────────────────────────────────────────────────────
+// Facet directions, spread over a hemisphere and mirrored, standing in for a
+// cut stone's crown and pavilion. Generated rather than tabulated so the count
+// is a constant to change, not a table to rewrite.
+vec3 facetN(int i){
+  float fi = float(i);
+  float a = fi * 2.3999632;                       // golden angle, so they do not band
+  float z = mix(.22, .92, fract(fi * .6180339));
+  float r = sqrt(max(0., 1. - z * z));
+  return normalize(vec3(cos(a) * r, sin(a) * r, z));
+}
+
+/**
+ * The panel as a piece of gem. The slab is the element's own footprint,
+ * extruded; the facets are half-spaces cut through it.
+ *
+ * The cuts are anchored in PAGE space, not the panel's, which is the whole
+ * trick: a facet plane runs on across the gap and slices the next panel too,
+ * so the panels read as pieces carved out of one stone rather than as
+ * separate gems that happen to match.
+ */
+float mapGem(vec3 q, float thick, float cut){
+  float d = 1e5;
+  for (int i = 0; i < uCount; i++) {
+    float f = uF[i];
+    if (f < .005) continue;
+    vec2 c = uP[i].xy;
+    vec2 h = uP[i].zw * f;
+    float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
+    float d2 = sdBoxG(q.xy - c, h, min(uR[i], vec4(min(h.x, h.y))), rmax).x;
+    vec2 w = vec2(d2, abs(q.z) - thick);
+    float de = min(max(w.x, w.y), 0.) + length(max(w, 0.)) - 1.5;
+    d = (i == 0) ? de : min(d, de);
+  }
+  // Cut the stone. Each plane repeats on a lattice so the whole page is one
+  // crystal the panels are taken out of. Six directions, and the lattice is
+  // wide — a few facets across a panel, not hundreds. Cut it finely and a gem
+  // stops being a gem and becomes gravel, which is exactly what nine planes at
+  // 34px produced on the first try.
+  for (int i = 0; i < 6; i++) {
+    vec3 nn = facetN(i);
+    if (fract(float(i) * .5) > .25) nn.z = -nn.z;   // mirror half of them below
+    // The plane sits near the far end of its lattice cell, so a cut trims a
+    // corner instead of slicing the body in half. Six planes at 70% of the
+    // cell removed most of the volume and left the panels as floating shards.
+    // A gem is faceted, not shattered.
+    float hgt = dot(q, nn);
+    float plane = floor(hgt / cut) * cut + cut * .965;
+    d = max(d, hgt - plane);
+  }
+  return d;
+}
+
+vec3 gemNormal(vec3 q, float thick, float cut){
+  vec2 e = vec2(.4, 0.);
+  return normalize(vec3(
+    mapGem(q + e.xyy, thick, cut) - mapGem(q - e.xyy, thick, cut),
+    mapGem(q + e.yxy, thick, cut) - mapGem(q - e.yxy, thick, cut),
+    mapGem(q + e.yyx, thick, cut) - mapGem(q - e.yyx, thick, cut)
+  ));
 }
 
 vec3 normal3(vec3 q, float tension, float thick){
@@ -474,62 +548,96 @@ void main(){
       plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
     } else if (uMat < 1.5) {
       // ── crystal ───────────────────────────────────────────────────────
-      // A panel made OF crystal, not one with a crystal texture on it. The
-      // difference is depth: the facets have to live inside the slab, so the
-      // view ray enters the surface, bends, and the pattern is sampled where
-      // that ray lands — parallax by thickness. Two layers at different depths
-      // give it volume, because a solid shows you more than one plane.
-      float thick = .35 + .85 * smoothstep(.05, .75, hHere);   // the slab's depth here
-      vec3 Nsurf = normalize(vec3(n * (.55 + .45 * bevel), max(.28, 1. - bevel * .8)));
-      vec3 Rin = refract(-V, Nsurf, .68);                      // into the material
+      // Modelled, not textured. The panel is a faceted solid; the ray enters
+      // it, bounces around inside by total internal reflection, and leaves
+      // through whichever facet finally lets it out. That bouncing is where a
+      // gem's life comes from — a stone with one refraction through it looks
+      // like tinted glass.
+      float gthick = max(uThick, 10.);
+      // Facet size in page px. Big, so a panel is a few faces of one stone.
+      float gcut = max(gthick * 11., 240.);
+      vec3 gro = vec3(p, gthick * 4.);
+      vec3 grd = normalize(vec3((p - uMouse) * .00022, -1.));
 
-      // Layer one: facets just under the surface.
-      vec2 p1 = p + Rin.xy * thick * 26.;
-      vec4 v1 = voronoi(p1 * .0145);
-      float ca1 = hash(v1.zw) * 6.2831853;
-      vec2 f1 = vec2(cos(ca1), sin(ca1)) * (.3 + .7 * hash(v1.zw + 5.1));
-      // Layer two: deeper, so moving the panel slides them against each other.
-      vec2 p2 = p + Rin.xy * thick * 62.;
-      vec4 v2 = voronoi(p2 * .0098 + 13.7);
-      float ca2 = hash(v2.zw) * 6.2831853;
-      vec2 f2 = vec2(cos(ca2), sin(ca2)) * (.3 + .7 * hash(v2.zw + 2.7));
+      float gt = 0.;
+      bool ghit = false;
+      for (int i = 0; i < 80; i++) {
+        vec3 q = gro + grd * gt;
+        float dd = mapGem(q, gthick, gcut);
+        if (dd < .25) { ghit = true; break; }
+        gt += max(dd * .70, .30);
+        if (gt > gthick * 9.) break;
+      }
 
-      // The facet that decides where the background goes is the near one, but
-      // the far one still bends it — that double bend is what makes a solid
-      // read as thick rather than as a sheet.
-      vec2 bend = (f1 * .65 + f2 * .35) * thick;
-      vec2 off2 = -bend * 120. * uRefract;
-      float d2 = (.34 + uEnergy * .12) * uDisp;
-      vec3 cr = vec3(
-        seen(p + off2 * (1. + d2), fr).r,
-        seen(p + off2, fr).g,
-        seen(p + off2 * (1. - d2), fr).b
-      );
-      cr = toLinear(cr);
-      // Absorption: a thicker path takes more out, which is why a crystal is
-      // pale at its thin edge and saturated through its body (Beer-Lambert).
-      vec3 absorb = exp(-thick * (1. - toLinear(mix(vec3(.92, .96, 1.), tcol, talpha))) * 2.2);
-      cr *= absorb;
+      if (!ghit) {
+        a = 0.;
+      } else {
+        vec3 q0 = gro + grd * gt;
+        vec3 N0 = gemNormal(q0, gthick, gcut);
+        float ndv0 = max(dot(N0, -grd), 1e-3);
 
-      // Internal walls, seen through the surface and dimmer with depth.
-      float w1 = 1. - smoothstep(.0, .06, v1.y - v1.x);
-      float w2 = 1. - smoothstep(.0, .09, v2.y - v2.x);
-      vec3 wallCol = vec3(.86, .93, 1.);
-      cr += wallCol * w1 * .30 * (1. - thick * .35);
-      cr += wallCol * w2 * .14 * (1. - thick * .55);
-      // Caustics: light pooling where walls meet, the brightest thing inside.
-      cr += wallCol * w1 * w2 * .9;
+        // Diamond's F0 is about 0.17 — far brighter than glass, which is why a
+        // gem throws back so much light before you ever see into it.
+        vec3 F0 = vec3(.17);
+        vec3 Fr = F_Schlick(F0, ndv0);
+        vec3 refl = envmap(reflect(grd, N0), .02);
 
-      // The outside of the slab: a hard specular and a fresnel edge.
-      float ndv = max(dot(Nsurf, V), 1e-3);
-      float ndl = max(dot(Nsurf, Ldir), 0.);
-      vec3 H = normalize(Ldir + V);
-      float aa = .045 * .045;
-      vec3 F = F_Schlick(vec3(.10), max(dot(H, V), 0.));
-      cr += F * D_GGX(max(dot(Nsurf, H), 0.), aa) * V_SmithGGX(ndv, ndl, aa) * ndl * 8. * uSpec;
-      cr += envmap(reflect(-V, Nsurf), .04) * pow(1. - ndv, 3.) * .65;
-      cr += toLinear(rimCol) * pow(1. - ndv, 5.) * .5 * uRim;
-      plasma = toSrgb(tonemap(cr));
+        // Dispersion: three traces, one per channel, at slightly different
+        // indices. This is where the fire comes from — the same ray leaves by
+        // different facets depending on its wavelength.
+        vec3 through = vec3(0.);
+        for (int ch = 0; ch < 3; ch++) {
+          float ior = 2.417 + (float(ch) - 1.) * .022 * max(uDisp, .001) * 6.;
+          vec3 rd2 = refract(grd, N0, 1. / ior);
+          vec3 pos = q0 - N0 * .6;
+          vec3 outDir = rd2;
+          float path = 0.;
+          // Up to three internal bounces, which is where the sparkle lives.
+          for (int b = 0; b < 3; b++) {
+            float ti = 0.;
+            bool inside = false;
+            for (int i = 0; i < 48; i++) {
+              vec3 qq = pos + rd2 * ti;
+              float dd = -mapGem(qq, gthick, gcut);   // inside, the field is negative
+              if (dd < .25) { inside = true; break; }
+              ti += max(dd * .70, .30);
+              if (ti > gthick * 12.) break;
+            }
+            if (!inside) break;
+            pos = pos + rd2 * ti;
+            path += ti;
+            vec3 Ni = -gemNormal(pos, gthick, gcut);   // facing into the material
+            vec3 outv = refract(rd2, Ni, ior);
+            if (dot(outv, outv) < 1e-6) {
+              // Total internal reflection: the ray cannot leave here, so it
+              // stays in the stone and keeps going.
+              rd2 = reflect(rd2, Ni);
+              pos += rd2 * .8;
+            } else {
+              outDir = outv;
+              break;
+            }
+          }
+          // What that ray finally sees, and what the stone took out of it on
+          // the way (Beer-Lambert over the path it travelled).
+          vec3 far = mix(envmap(outDir, .0), toLinear(seen(p + outDir.xy * 190., 0.)), .45);
+          float absorb = exp(-path * .004);
+          through[ch] = far[ch] * absorb;
+        }
+        vec3 tint3 = toLinear(mix(vec3(1.), tcol, talpha * .7));
+        vec3 cr = through * tint3 * (1. - Fr) + refl * Fr;
+
+        // A hard specular on the entry facet, and the glint: facets nearly
+        // edge-on to the light flash, which is the discrete sparkle a gem has
+        // and a smooth highlight never does.
+        vec3 H = normalize(Ldir - grd);
+        float aa = .015 * .015;
+        float ndl0 = max(dot(N0, Ldir), 0.);
+        cr += F_Schlick(F0, max(dot(H, -grd), 0.))
+            * D_GGX(max(dot(N0, H), 0.), aa) * V_SmithGGX(ndv0, ndl0, aa) * ndl0 * 22. * uSpec;
+        plasma = toSrgb(tonemap(cr * 1.15));
+        a = 1.;
+      }
     } else if (uMat < 3.5) {
       bool merc = uMat > 2.5;
       if (merc) {
@@ -544,11 +652,11 @@ void main(){
         vec3 ro = vec3(p, thick * 3.5);
         vec3 rd = normalize(vec3((p - uMouse) * .00035, -1.));   // a hair of perspective
         float t = 0., hit = -1.;
-        for (int i = 0; i < 48; i++) {
+        for (int i = 0; i < 96; i++) {
           vec3 q = ro + rd * t;
           float dd = map3(q, tension, thick);
           if (dd < .35) { hit = t; break; }
-          t += max(dd * .85, .5);
+          t += max(dd * .30, .25);
           if (t > thick * 8.) break;
         }
         if (hit < 0.) {
@@ -574,6 +682,11 @@ void main(){
                    * V_SmithGGX(ndv, ndl, aa) * ndl;
           vec3 me = env * Fr + sun * 16. * uSpec;
           me += F0 * .03;
+          // Shimmer comes from the modelled swell moving under a sharp
+          // highlight, not from a noise field tinting the surface. The only
+          // colour added is thin-film interference, which is a function of the
+          // angle the geometry presents — no texture in it.
+          me += toLinear(pal(pow(1. - ndv, 1.6) * 1.4)) * .12 * uShim * pow(1. - ndv, .9);
           plasma = toSrgb(tonemap(me));
           // The silhouette is the march's, so a bead that has pulled away from
           // the rectangle actually looks pulled away.
