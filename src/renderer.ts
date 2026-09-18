@@ -42,6 +42,12 @@ export interface RendererSettings {
   roughness: number;
   /** How far the highlight stretches along the grain. 0 is isotropic. */
   anisotropy: number;
+  /** How far the outline is displaced from the rounded box, in CSS px. 0 leaves it clean. */
+  edge: number;
+  /** Size of the displacement, in cycles per px. Small is billows, large is chips. */
+  edgeScale: number;
+  /** 0 rolls the displaced edge, 1 breaks it into flats and points. */
+  edgeSharpness: number;
   /** 0 = watery and bouncy, 1 = thick and slow. */
   viscosity: number;
   /** How far the surface trails behind moving panels. 0 = no trailing. */
@@ -67,7 +73,7 @@ export interface RendererSettings {
  * default; the rest share its geometry, its springs and its fusing, and differ
  * only in the composite pass — which is the whole reason they are cheap.
  */
-export const MATERIALS = ["plasma", "crystal", "metal", "wood", "stone", "cloud"] as const;
+export const MATERIALS = ["plasma", "crystal", "metal", "mercury", "wood", "stone", "cloud"] as const;
 export type MaterialName = (typeof MATERIALS)[number];
 
 /** Anything the background can be: a CSS color string, an image URL, or an element to sample (canvas and video update live). */
@@ -133,7 +139,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -1002,6 +1008,9 @@ export class PlasmaRenderer {
     gl.uniform3f(c.u.uLightDir, s.lightDir[0], s.lightDir[1], s.lightDir[2]);
     gl.uniform1f(c.u.uRough, s.roughness);
     gl.uniform1f(c.u.uAniso, s.anisotropy);
+    gl.uniform1f(c.u.uEdge, s.edge);
+    gl.uniform1f(c.u.uEdgeScale, s.edgeScale);
+    gl.uniform1f(c.u.uEdgeSharp, s.edgeSharpness);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.rtC.tex);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.rtA.tex);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.rtT.tex);

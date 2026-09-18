@@ -1093,6 +1093,12 @@ function Api() {
                 "Metal's finish, and how far a highlight stretches along the grain.",
               ],
               [
+                "edge · edgeScale · edgeSharpness",
+                "number",
+                "0 · 0.01 · 0",
+                "Displace the outline off its rounded box: stone chips, cloud billows, metal is cut.",
+              ],
+              [
                 "backgroundBlur",
                 "number",
                 "0",

@@ -57,6 +57,16 @@ export interface PlasmaProviderProps {
   roughness?: number;
   /** How far a highlight stretches along the grain. 0 is isotropic. Default 0. */
   anisotropy?: number;
+  /**
+   * How far the outline is displaced from its rounded box, in CSS px. A
+   * rounded rectangle is right for a liquid and wrong for almost everything
+   * else: stone chips, cloud billows, cut metal does neither. Default 0.
+   */
+  edge?: number;
+  /** Size of that displacement, in cycles per px: small is billows, large is chips. Default 0.01. */
+  edgeScale?: number;
+  /** 0 rolls the displaced edge, 1 breaks it into flats and points. Default 0. */
+  edgeSharpness?: number;
   /** Blur the background itself, in CSS px, 0-40. Softens the whole field, unlike `frost`, which blurs only what a frosted surface sees. Default 0. */
   backgroundBlur?: number;
   /** How thick the material feels: 0 is watery and bouncy, 1 is slow like syrup. Also scales drag and snap springs. Default 0.5. */
@@ -245,6 +255,7 @@ export function PlasmaProvider({
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
   shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0,
   material = "plasma", lightDir = [-0.42, -0.62, 0.66], roughness = 0.28, anisotropy = 0,
+  edge = 0, edgeScale = 0.01, edgeSharpness = 0,
   pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
   freezeOnScroll = false, canvas = true,
 }: PlasmaProviderProps) {
@@ -262,7 +273,7 @@ export function PlasmaProvider({
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
     pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
     rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur,
-    material, lightDir, roughness, anisotropy,
+    material, lightDir, roughness, anisotropy, edge, edgeScale, edgeSharpness,
     viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };
   const settingsRef = useLatest(settings);

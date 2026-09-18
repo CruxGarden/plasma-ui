@@ -46,6 +46,11 @@ const NOTES: Record<MaterialName, { blurb: string; technique: string }> = {
     technique:
       "Three octaves of warped noise plus per-pixel flecks, differenced into a detail normal. Roughness 0.72, so the specular is a broad sheen rather than a point. A dusty fresnel at the edge.",
   },
+  mercury: {
+    blurb: "The same conductor, with the surface tension left in.",
+    technique:
+      "Metal's BRDF at a mirror finish, but the bevel rolls all the way across the face instead of stopping at the edge, and the micro-relief is gone. Fusing does the rest: two panels meeting run together into one bead. Metal is milled; mercury is poured.",
+  },
   cloud: {
     blurb: "The one volume rather than a surface.",
     technique:
@@ -54,6 +59,40 @@ const NOTES: Record<MaterialName, { blurb: string; technique: string }> = {
 };
 
 const OPAQUE: MaterialName[] = ["wood", "stone", "metal"];
+
+/**
+ * Plain grounds, because the mood field is a moving, coloured thing and every
+ * material picks it up — the refractive ones bend it, the reflective ones show
+ * it back, and it becomes impossible to say whether what you are looking at is
+ * the material or the wallpaper. Judge against a flat colour first; the field
+ * is still here to check they survive it.
+ */
+const GROUNDS: { name: string; value: string | undefined }[] = [
+  { name: "Slate", value: "#16191d" },
+  { name: "Paper", value: "#d9d4cb" },
+  { name: "Mid", value: "#6c6f74" },
+  { name: "Ink", value: "#08090b" },
+  { name: "Field", value: undefined },
+];
+
+/**
+ * How each material wants its outline. A rounded rectangle is right for a
+ * liquid and wrong for most of the rest: metal is cut, stone chips, cloud
+ * billows. `radius` is the corner, `edge` how far the outline wanders from it,
+ * `edgeScale` how big those wanders are, `sharp` whether they roll or break.
+ */
+const SHAPE: Record<
+  MaterialName,
+  { radius: number; edge: number; edgeScale: number; sharp: number }
+> = {
+  plasma: { radius: 26, edge: 0, edgeScale: 0.01, sharp: 0 },
+  crystal: { radius: 10, edge: 3, edgeScale: 0.05, sharp: 1 },
+  metal: { radius: 3, edge: 0, edgeScale: 0.01, sharp: 0 },
+  mercury: { radius: 44, edge: 2, edgeScale: 0.004, sharp: 0 },
+  wood: { radius: 5, edge: 1.5, edgeScale: 0.02, sharp: 0.3 },
+  stone: { radius: 8, edge: 7, edgeScale: 0.03, sharp: 0.85 },
+  cloud: { radius: 40, edge: 26, edgeScale: 0.005, sharp: 0 },
+};
 
 function Pulse() {
   const { pulse } = usePlasmaRuntime();
@@ -70,6 +109,13 @@ export function App() {
   const [anisotropy, setAnisotropy] = useState(0);
   const [angle, setAngle] = useState(235);
   const [frost, setFrost] = useState(0.3);
+  const [shape, setShape] = useState(SHAPE.plasma);
+  const [ground, setGround] = useState(GROUNDS[0]);
+
+  const pick = (m: MaterialName) => {
+    setMaterial(m);
+    setShape(SHAPE[m]);
+  };
 
   const rad = (angle * Math.PI) / 180;
   const lightDir: [number, number, number] = [
@@ -84,10 +130,15 @@ export function App() {
     <PlasmaProvider
       mood="tidal"
       theme="dark"
+      background={ground.value}
       material={material}
       lightDir={lightDir}
       roughness={roughness}
       anisotropy={anisotropy}
+      edge={shape.edge}
+      edgeScale={shape.edgeScale}
+      edgeSharpness={shape.sharp}
+      radius={shape.radius}
       frost={material === "plasma" || material === "crystal" ? frost : 0}
       blend={24}
       elevation={material === "cloud" ? 0 : 0.4}
@@ -97,7 +148,7 @@ export function App() {
       <div className="page">
         <Plasma
           className="bar"
-          radius={20}
+          radius={shape.radius}
           padding={14}
           fuse={false}
           lean={false}
@@ -108,9 +159,20 @@ export function App() {
               <button
                 key={m}
                 aria-pressed={m === material}
-                onClick={() => setMaterial(m)}
+                onClick={() => pick(m)}
               >
                 {m}
+              </button>
+            ))}
+          </div>
+          <div className="seg grounds">
+            {GROUNDS.map((g) => (
+              <button
+                key={g.name}
+                aria-pressed={g.name === ground.name}
+                onClick={() => setGround(g)}
+              >
+                {g.name}
               </button>
             ))}
           </div>
@@ -118,7 +180,12 @@ export function App() {
         </Plasma>
 
         <div className="body">
-          <Plasma className="card lead" radius={26} padding={22} lean={false}>
+          <Plasma
+            className="card lead"
+            radius={shape.radius}
+            padding={22}
+            lean={false}
+          >
             <div className="plate">
               <h2>{material}</h2>
               <p className="blurb">{note.blurb}</p>
@@ -127,7 +194,12 @@ export function App() {
           </Plasma>
 
           <div className="col">
-            <Plasma className="card" radius={26} padding={18} lean={false}>
+            <Plasma
+              className="card"
+              radius={shape.radius}
+              padding={18}
+              lean={false}
+            >
               <div className="plate">
                 <h3>Legibility</h3>
                 <p>
@@ -136,7 +208,12 @@ export function App() {
                 </p>
               </div>
             </Plasma>
-            <Plasma className="card" radius={26} padding={18} lean={false}>
+            <Plasma
+              className="card"
+              radius={shape.radius}
+              padding={18}
+              lean={false}
+            >
               <div className="plate thin">
                 <h3>Bare</h3>
                 <p>
@@ -150,7 +227,7 @@ export function App() {
           <div className="col">
             <Plasma
               className="card tall"
-              radius={26}
+              radius={shape.radius}
               padding={18}
               draggable
               lean={false}
@@ -168,7 +245,7 @@ export function App() {
 
         <Plasma
           className="bar controls"
-          radius={20}
+          radius={shape.radius}
           padding={14}
           fuse={false}
           lean={false}
@@ -221,6 +298,39 @@ export function App() {
               step={0.05}
               value={frost}
               onChange={(e) => setFrost(+e.target.value)}
+            />
+          </label>
+          <label>
+            Corner <span>{shape.radius}</span>
+            <input
+              type="range"
+              min={0}
+              max={52}
+              step={1}
+              value={shape.radius}
+              onChange={(e) => setShape({ ...shape, radius: +e.target.value })}
+            />
+          </label>
+          <label>
+            Edge <span>{shape.edge}</span>
+            <input
+              type="range"
+              min={0}
+              max={36}
+              step={1}
+              value={shape.edge}
+              onChange={(e) => setShape({ ...shape, edge: +e.target.value })}
+            />
+          </label>
+          <label className={shape.edge > 0 ? "" : "off"}>
+            Ragged <span>{shape.sharp.toFixed(2)}</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={shape.sharp}
+              onChange={(e) => setShape({ ...shape, sharp: +e.target.value })}
             />
           </label>
         </Plasma>

@@ -10,6 +10,7 @@ p { margin: 0 0 .6rem; }
 .page { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 16px; padding: 18px; }
 .bar { flex: none; display: flex; align-items: center; gap: 16px; }
 .wordmark { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 1.3rem; }
+.grounds { margin-right: 0; }
 .seg { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: rgb(0 0 0 / .26); margin-right: auto; }
 .seg button { font: 500 .82rem Onest; color: var(--text); background: none; border: 0; cursor: pointer; padding: .35rem .8rem; border-radius: 999px; text-transform: capitalize; }
 .seg button[aria-pressed="true"] { background: var(--on); color: var(--on-text); }

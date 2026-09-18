@@ -206,12 +206,21 @@ uniform vec3 uLightDir;
 // chalk. Anisotropy stretches the highlight along the grain — brushed metal
 // and varnished wood both need it, and neither reads right without it.
 uniform float uRough, uAniso;
+// The edge treatment. A rounded rectangle is right for a liquid, and wrong for
+// almost everything else: stone chips, cloud billows, metal is cut. These
+// displace the silhouette itself — amplitude in CSS px, scale in cycles —
+// before anything decides what is inside, so the outline, the rim, the shadow
+// and the material all agree about where the panel ends.
+uniform float uEdge, uEdgeScale, uEdgeSharp;
 uniform vec3 uRimColor;
 out vec4 o;
 
 vec3 pal(float t){ return .5 + .5*cos(6.2831*(t + vec3(0., .33, .67))); }
 float H(vec2 uv){ return texture(uH, uv).r; }
-vec2 uvAt(vec2 q){ return vec2(q.x, uRes.y - q.y) / uRes; }
+// Clamped, because a reflection offset is far larger than a refraction one:
+// metal sweeps up to 150px and walks straight off the texture, where
+// CLAMP_TO_EDGE smears the last row of pixels into arcs across the panel.
+vec2 uvAt(vec2 q){ return clamp(vec2(q.x, uRes.y - q.y) / uRes, vec2(.001), vec2(.999)); }
 // background seen through plasma with frost f: sharp, then medium, then heavy blur
 vec3 seen(vec2 q, float f){
   vec2 u = uvAt(q);
@@ -275,6 +284,27 @@ vec3 envmap(vec3 R, float rough){
   return c;
 }
 
+// Worley/Voronoi: nearest cell, second nearest, and the cell's id. The gap
+// between the two is the distance to a cell wall, which is what draws the
+// seams of a crystal without any geometry.
+vec4 voronoi(vec2 q){
+  vec2 ip = floor(q), fp = fract(q);
+  float d1 = 8., d2 = 8.;
+  vec2 id = vec2(0.);
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 cell = ip + g;
+      vec2 o = vec2(hash(cell), hash(cell + 31.7));
+      vec2 r = g + o - fp;
+      float d = dot(r, r);
+      if (d < d1) { d2 = d1; d1 = d; id = cell; }
+      else if (d < d2) { d2 = d; }
+    }
+  }
+  return vec4(sqrt(d1), sqrt(d2), id);
+}
+
 // B-spline bicubic from four bilinear taps keeps curved outlines round.
 float S(vec2 uv){
   vec2 ts = vec2(textureSize(uS, 0));
@@ -301,6 +331,19 @@ void main(){
   float s = S(uv);
   vec2 gs = vec2(S(uv+vec2(tx.x,0.)) - S(uv-vec2(tx.x,0.)), S(uv+vec2(0.,tx.y)) - S(uv-vec2(0.,tx.y))) / (2.*cssPerTexel);
   float sd = clamp((s - .5) / max(length(gs), 1e-3), -60., 60.);
+  if (uEdge > .01) {
+    // Two octaves: the first gives the large shape (billows, chips), the
+    // second the fine break-up. Warping keeps it from reading as a sine wave
+    // stamped around the outline.
+    vec2 ep = warp(p * uEdgeScale, .7);
+    float e1 = fbm(ep) - .5;
+    float e2 = fbm(ep * 3.3 + 17.) - .5;
+    float disp = e1 * 1.5 + e2 * .55;
+    // uEdgeSharp 0 leaves it rolling; 1 pushes it toward flats and points,
+    // which is what reads as chipped rather than melted.
+    disp = mix(disp, sign(disp) * pow(abs(disp) * 2., .55) * .5, clamp(uEdgeSharp, 0., 1.));
+    sd += disp * uEdge;
+  }
 
   vec3 back = texture(uBg, uv).rgb;
   float grain = 1.;
@@ -382,52 +425,77 @@ void main(){
       plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
     } else if (uMat < 1.5) {
       // ── crystal ───────────────────────────────────────────────────────
-      // Faceted, not rolled: the bevel is cut into flats, so the lens jumps
-      // between them instead of sweeping. Refracted twice — in through the
-      // front face and out through the back — which is what separates crystal
-      // from a pane of glass, and dispersed on both legs.
-      float fa = atan(n.y, n.x);
-      const float FACETS = 7.;
-      float snapped = floor(fa * FACETS / 6.2831853 + .5) * 6.2831853 / FACETS;
-      vec2 fq = vec2(cos(snapped), sin(snapped));
-      vec3 Nf = normalize(vec3(fq * (.35 + .65 * bevel), max(.18, 1. - bevel)));
+      // A panel made OF crystal, not one with a crystal texture on it. The
+      // difference is depth: the facets have to live inside the slab, so the
+      // view ray enters the surface, bends, and the pattern is sampled where
+      // that ray lands — parallax by thickness. Two layers at different depths
+      // give it volume, because a solid shows you more than one plane.
+      float thick = .35 + .85 * smoothstep(.05, .75, hHere);   // the slab's depth here
+      vec3 Nsurf = normalize(vec3(n * (.55 + .45 * bevel), max(.28, 1. - bevel * .8)));
+      vec3 Rin = refract(-V, Nsurf, .68);                      // into the material
 
-      float thick = pow(bevel, 1.5) * slope;
-      vec2 enter = -fq * thick * 44. * uRefract;
-      vec2 exit  = -refract(V, Nf, .76).xy * thick * 40. * uRefract;
-      vec2 off2 = enter + exit;
-      float d2 = (.30 + uEnergy * .10) * uDisp;
+      // Layer one: facets just under the surface.
+      vec2 p1 = p + Rin.xy * thick * 26.;
+      vec4 v1 = voronoi(p1 * .0145);
+      float ca1 = hash(v1.zw) * 6.2831853;
+      vec2 f1 = vec2(cos(ca1), sin(ca1)) * (.3 + .7 * hash(v1.zw + 5.1));
+      // Layer two: deeper, so moving the panel slides them against each other.
+      vec2 p2 = p + Rin.xy * thick * 62.;
+      vec4 v2 = voronoi(p2 * .0098 + 13.7);
+      float ca2 = hash(v2.zw) * 6.2831853;
+      vec2 f2 = vec2(cos(ca2), sin(ca2)) * (.3 + .7 * hash(v2.zw + 2.7));
+
+      // The facet that decides where the background goes is the near one, but
+      // the far one still bends it — that double bend is what makes a solid
+      // read as thick rather than as a sheet.
+      vec2 bend = (f1 * .65 + f2 * .35) * thick;
+      vec2 off2 = -bend * 120. * uRefract;
+      float d2 = (.34 + uEnergy * .12) * uDisp;
       vec3 cr = vec3(
         seen(p + off2 * (1. + d2), fr).r,
         seen(p + off2, fr).g,
         seen(p + off2 * (1. - d2), fr).b
       );
-      cr = toLinear(cr) * 1.35;
-      cr = mix(cr, toLinear(tcol), talpha * .8);
+      cr = toLinear(cr);
+      // Absorption: a thicker path takes more out, which is why a crystal is
+      // pale at its thin edge and saturated through its body (Beer-Lambert).
+      vec3 absorb = exp(-thick * (1. - toLinear(mix(vec3(.92, .96, 1.), tcol, talpha))) * 2.2);
+      cr *= absorb;
 
-      // Total internal reflection at grazing angles gives crystal its bright,
-      // hard edge — a Fresnel term, not a drawn outline.
-      float ndv = max(dot(Nf, V), 1e-3);
-      float ndl = max(dot(Nf, Ldir), 0.);
+      // Internal walls, seen through the surface and dimmer with depth.
+      float w1 = 1. - smoothstep(.0, .06, v1.y - v1.x);
+      float w2 = 1. - smoothstep(.0, .09, v2.y - v2.x);
+      vec3 wallCol = vec3(.86, .93, 1.);
+      cr += wallCol * w1 * .30 * (1. - thick * .35);
+      cr += wallCol * w2 * .14 * (1. - thick * .55);
+      // Caustics: light pooling where walls meet, the brightest thing inside.
+      cr += wallCol * w1 * w2 * .9;
+
+      // The outside of the slab: a hard specular and a fresnel edge.
+      float ndv = max(dot(Nsurf, V), 1e-3);
+      float ndl = max(dot(Nsurf, Ldir), 0.);
       vec3 H = normalize(Ldir + V);
-      float rough = .06;
-      vec3 F = F_Schlick(vec3(.08), max(dot(H, V), 0.));
-      float specD = D_GGX(max(dot(Nf, H), 0.), rough*rough) * V_SmithGGX(ndv, ndl, rough*rough);
-      cr += F * specD * ndl * 9. * uSpec;
-      cr += envmap(reflect(-V, Nf), .05) * pow(1. - ndv, 3.) * .55;
-      cr += toLinear(rimCol) * pow(1. - ndv, 4.) * .7 * uRim;
-      // seams where facets meet
-      float seam = 1. - smoothstep(0., .10, abs(fract(fa * FACETS / 6.2831853 + .5) - .5));
-      cr += vec3(.9, .96, 1.) * seam * thick * .35;
+      float aa = .045 * .045;
+      vec3 F = F_Schlick(vec3(.10), max(dot(H, V), 0.));
+      cr += F * D_GGX(max(dot(Nsurf, H), 0.), aa) * V_SmithGGX(ndv, ndl, aa) * ndl * 8. * uSpec;
+      cr += envmap(reflect(-V, Nsurf), .04) * pow(1. - ndv, 3.) * .65;
+      cr += toLinear(rimCol) * pow(1. - ndv, 5.) * .5 * uRim;
       plasma = toSrgb(tonemap(cr));
-    } else if (uMat < 2.5) {
-      // ── metal ─────────────────────────────────────────────────────────
+    } else if (uMat < 3.5) {
+      // ── metal, and mercury ─────────────────────────────────────────────────────────
       // No diffuse term at all — a conductor has none; its colour lives in F0.
       // The reflection is prefiltered by roughness, and seen() already is a
       // three-level blurred copy of the background, so the frost chain doubles
       // as an environment mip. That reuse is why metal costs almost nothing.
-      float rough = clamp(uRough, .04, .95);
-      vec3 Nm = Nb;
+      // Mercury is the same conductor with the surface tension left in: a
+      // mirror finish, a bevel that rolls all the way across the face instead
+      // of stopping at the edge, and no micro-relief to break it up. Metal is
+      // milled; mercury is poured.
+      bool merc = uMat > 2.5;
+      float rough = merc ? .035 : clamp(uRough, .04, .95);
+      vec3 Nm = merc
+        ? normalize(vec3(n * (.62 + .38 * bevel) * (.35 + .65 * lift), max(.12, 1. - bevel * .85)))
+        : Nb;
       // brushed: scratch the normal along one axis, and stretch the highlight
       float aniso = uAniso;
       if (aniso > .01) {
@@ -442,14 +510,16 @@ void main(){
       // roughness. Rough metal must not show a sharp background or it is foil.
       // Micro-relief across the face: without it the interior is one flat
       // normal, the reflection never moves, and the panel is a grey rectangle.
-      float mr = fbm(p * .035) - .5;
-      Nm = normalize(Nm + vec3(mr * .16, (fbm(p * .035 + 11.) - .5) * .16, 0.));
+      if (!merc) {
+        float mr = fbm(p * .035) - .5;
+        Nm = normalize(Nm + vec3(mr * .16, (fbm(p * .035 + 11.) - .5) * .16, 0.));
+      }
       R = reflect(-V, Nm);
       vec2 roff = R.xy * pow(bevel, .9) * 150. * (1. - rough * .5);
       // The studio carries the structure; the page background keeps it part of
       // the same scene rather than a cutout pasted on top.
-      vec3 env = mix(envmap(R, rough), toLinear(seen(p - roff, rough)), .22);
-      vec3 F0 = mix(vec3(.95, .93, .88), toLinear(tcol), talpha);
+      vec3 env = mix(envmap(R, rough), toLinear(seen(p - roff, rough)), merc ? .30 : .22);
+      vec3 F0 = mix(merc ? vec3(.86, .87, .90) : vec3(.95, .93, .88), toLinear(tcol), talpha);
       vec3 Fr = F_Schlick(F0, ndv);
       float aa = max(rough * rough, 1e-3);
       float D = aniso > .01
@@ -459,33 +529,34 @@ void main(){
       vec3 me = env * Fr + sun * 14. * uSpec;
       me += F0 * .035;                                  // a floor, so it is never black
       plasma = toSrgb(tonemap(me));
-    } else if (uMat < 3.5) {
+    } else if (uMat < 4.5) {
       // ── wood ──────────────────────────────────────────────────────────
       // Grain lives in page coordinates, so a panel that resizes keeps its
       // grain instead of stretching it — the first thing an opaque natural
       // material asks for that glass never did.
-      vec2 wp = p * .0034;
+      vec2 wp = p * .0021;
       // Rings are warped, then squeezed across one axis: straight fbm reads as
       // camouflage, warped fbm reads as a board cut from a trunk.
       vec2 wq = warp(vec2(wp.x * .40, wp.y * 4.2), .55);
-      float ring = fract(fbm(wq) * 3.1);
+      float ring = fract(fbm(wq) * 2.05);
       float band = abs(ring - .5) * 2.;
-      float pore = fbm(vec2(p.x * .35, p.y * .04));
+      float pore = fbm(vec2(p.x * .18, p.y * .022));
       float h0 = band * .7 + pore * .3;
       // Detail normal by finite difference of that height, so the grain
       // actually catches the light instead of being painted on.
       vec2 e = vec2(1.4, 0.);
-      float hx = fract(fbm(warp(vec2((wp.x + e.x*.0034) * .40, wp.y * 4.2), .55)) * 3.1);
-      float hy = fract(fbm(warp(vec2(wp.x * .40, (wp.y + e.x*.0034) * 4.2), .55)) * 3.1);
+      float hx = fract(fbm(warp(vec2((wp.x + e.x*.0021) * .40, wp.y * 4.2), .55)) * 2.05);
+      float hy = fract(fbm(warp(vec2(wp.x * .40, (wp.y + e.x*.0021) * 4.2), .55)) * 2.05);
       hx = abs(hx - .5) * 2.; hy = abs(hy - .5) * 2.;
-      vec3 Nw = normalize(Nb + vec3((hx - band) * 2.2, (hy - band) * 2.2, 0.));
+      vec3 Nw = normalize(Nb + vec3((hx - band) * .85, (hy - band) * .85, 0.));
 
       // Real boards are lower contrast than the first instinct: a wide dark-to
       // -light sweep reads as charring, not as timber.
       vec3 lightWood = toLinear(vec3(.62, .45, .28));
       vec3 darkWood  = toLinear(vec3(.40, .26, .145));
-      vec3 alb = mix(darkWood, lightWood, smoothstep(.22, .78, band));
-      alb *= .90 + .18 * pore;
+      // A board is mostly one tone with the grain reading as a whisper over it.
+      vec3 alb = mix(darkWood, lightWood, smoothstep(.30, .70, band) * .55 + .22);
+      alb *= .95 + .09 * pore;
       alb = mix(alb, toLinear(tcol), talpha * .6);
 
       float ndv = max(dot(Nw, V), 1e-3);
@@ -499,7 +570,7 @@ void main(){
       wo += F * D * V_SmithGGX(ndv, ndl, aa) * ndl * 5.5 * uSpec;
       wo += alb * pow(1. - ndv, 3.5) * .35;
       plasma = toSrgb(tonemap(wo));
-    } else if (uMat < 4.5) {
+    } else if (uMat < 5.5) {
       // ── stone ─────────────────────────────────────────────────────────
       vec2 sq = warp(p * .022, .9);
       float body = fbm(sq) * .62 + fbm(sq * 3.7) * .26 + fbm(sq * 11.) * .12;
@@ -530,19 +601,23 @@ void main(){
       // and the light is marched rather than dotted: transmittance by
       // Beer-Lambert, scattering by Henyey-Greenstein. A lambert cloud looks
       // painted; a marched one looks lit from a direction.
-      float inside = smoothstep(-1., 30., sd);
-      vec2 dq = warp(p * .0042 + vec2(uTime * .012, uTime * .004), 1.1);
-      float base = fbm(dq) * .62 + fbm(dq * 2.9) * .26 + fbm(dq * 7.3) * .12;
-      float dens = clamp(inside * (base * 1.9 - .42), 0., 1.);
+      // Bounded tight to the silhouette, which the edge displacement has
+      // already made billowy — the panel's outline is the cloud's outline. The
+      // interior is dense, so it reads as a thing made of cloud rather than as
+      // haze lying over a rectangle.
+      float inside = smoothstep(-1., 9., sd);
+      vec2 dq = warp(p * .0058 + vec2(uTime * .010, uTime * .004), 1.15);
+      float base = fbm(dq) * .58 + fbm(dq * 2.7) * .28 + fbm(dq * 6.9) * .14;
+      float dens = clamp(inside * (.55 + base * 1.15) - .12, 0., 1.);
 
       // March toward the light and accumulate what it has to pass through.
       float shadow = 0.;
       vec2 step2 = normalize(Ldir.xy + vec2(1e-4)) * 16.;
       for (int i = 1; i <= 5; i++) {
         vec2 sp3 = p + step2 * float(i);
-        float ins = smoothstep(-1., 30., sd + float(i) * 6.);
-        vec2 q3 = warp(sp3 * .0042 + vec2(uTime * .012, uTime * .004), 1.1);
-        shadow += clamp(ins * (fbm(q3) * 1.9 - .42), 0., 1.);
+        float ins = smoothstep(-1., 9., sd + float(i) * 5.);
+        vec2 q3 = warp(sp3 * .0058 + vec2(uTime * .010, uTime * .004), 1.15);
+        shadow += clamp(ins * (.55 + fbm(q3) * 1.15) - .12, 0., 1.);
       }
       float transmit = exp(-shadow * .55);
       float cosT = dot(normalize(vec3(n, .6)), Ldir);
@@ -553,7 +628,7 @@ void main(){
       vec3 cl = skyCol * (.35 + .65 * dens) + sunCol * transmit * (.55 + 5.5 * hg);
       cl = mix(cl, toLinear(tcol), talpha * .45);
       plasma = toSrgb(tonemap(cl));
-      a = smoothstep(.02, .55, dens);   // density is the coverage, not the outline
+      a = smoothstep(.04, .42, dens);   // density is the coverage, not the outline
     }
 
     col = mix(col, plasma, a);
