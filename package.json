@@ -11,7 +11,7 @@
     "typecheck:react19": "npm i --no-save --no-audit --no-fund @types/react@19 @types/react-dom@19 && tsc -p tsconfig.app.json",
     "format:check": "prettier --check site examples scripts",
     "test": "node --test tests/*.test.mjs",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run verify",
     "format": "prettier --write .",
     "check:docs": "node scripts/check-docs.mjs",
     "verify": "npm run typecheck && npm run typecheck:app && npm run format:check && npm test && npm run build && npm run check:docs",
