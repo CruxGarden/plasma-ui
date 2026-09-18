@@ -336,6 +336,53 @@ float map3(vec3 q, float tension, float thick){
   return d;
 }
 
+/**
+ * A crystalline crown: the panel's face is a regular triangular lattice, and
+ * every triangle is a flat facet with its own plane.
+ *
+ * Regular, not random — a Delaunay scatter reads as shattered safety glass,
+ * and a lattice reads as something cut. The heights at the lattice corners are
+ * hashed, so the facets tilt differently while the pattern stays symmetric.
+ *
+ * The normal comes out exact rather than differenced, which is what makes the
+ * faces crisp: a facet is a plane, so its normal is constant across it, and
+ * there is nothing for a march to stipple.
+ */
+vec3 facetPlane(vec2 uv, float amp, out float height){
+  vec2 c = floor(uv), f = fract(uv);
+  float h00 = hash(c) * amp;
+  float h10 = hash(c + vec2(1., 0.)) * amp;
+  float h01 = hash(c + vec2(0., 1.)) * amp;
+  float h11 = hash(c + vec2(1., 1.)) * amp;
+  float dx, dy;
+  // Which way the cell's diagonal runs is decided per cell. One diagonal
+  // everywhere reads as corduroy; alternating reads as cut.
+  bool flip = hash(c + 91.7) > .5;
+  bool lower = flip ? (f.x + f.y < 1.) : (f.x > f.y);
+  if (lower) {
+    height = h00 + (h10 - h00) * f.x + (h01 - h00) * f.y;
+    dx = h10 - h00; dy = h01 - h00;
+  } else {
+    height = h11 + (h01 - h11) * (1. - f.x) + (h10 - h11) * (1. - f.y);
+    dx = h11 - h01; dy = h11 - h10;
+  }
+  return normalize(vec3(-dx, -dy, 1.));
+}
+
+/**
+ * The crystal's top surface, as a height in page px, plus the exact plane
+ * normal of whichever facet the point lies on. This is a real surface: the
+ * march below has to find where the ray crosses it, so the facets occlude one
+ * another, break the silhouette, and shadow each other. A normal returned
+ * without an intersection would be a normal map, which is what the version
+ * before this was.
+ */
+float crownZ(vec2 xy, float gcut, float amp, float thick, out vec3 nrm){
+  float h;
+  nrm = facetPlane(xy / gcut, amp / gcut, h);
+  return thick + h * gcut;
+}
+
 // ── The gem ───────────────────────────────────────────────────────────────
 // Facet directions, spread over a hemisphere and mirrored, standing in for a
 // cut stone's crown and pavilion. Generated rather than tabulated so the count
@@ -548,94 +595,98 @@ void main(){
       plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
     } else if (uMat < 1.5) {
       // ── crystal ───────────────────────────────────────────────────────
-      // Modelled, not textured. The panel is a faceted solid; the ray enters
-      // it, bounces around inside by total internal reflection, and leaves
-      // through whichever facet finally lets it out. That bouncing is where a
-      // gem's life comes from — a stone with one refraction through it looks
-      // like tinted glass.
+      // Actual 3D. The panel is a solid whose top is a cut crown — a lattice
+      // of flat facets, anchored in PAGE space so a facet runs on across the
+      // gap into the next panel. The view ray is marched until it crosses that
+      // surface, so the facets genuinely occlude each other, break the
+      // silhouette where they rise and fall, and shadow one another.
+      //
+      // A height field is marched by stepping and testing which side of the
+      // surface you are on, then bisecting — not by sphere tracing, which a
+      // piecewise-planar field is hostile to.
+      float gcut = max(uThick * 2.4, 52.);
+      float amp = gcut * .45;
       float gthick = max(uThick, 10.);
-      // Facet size in page px. Big, so a panel is a few faces of one stone.
-      float gcut = max(gthick * 11., 240.);
-      vec3 gro = vec3(p, gthick * 4.);
-      vec3 grd = normalize(vec3((p - uMouse) * .00022, -1.));
 
-      float gt = 0.;
-      bool ghit = false;
-      for (int i = 0; i < 80; i++) {
-        vec3 q = gro + grd * gt;
-        float dd = mapGem(q, gthick, gcut);
-        if (dd < .25) { ghit = true; break; }
-        gt += max(dd * .70, .30);
-        if (gt > gthick * 9.) break;
+      vec3 gro = vec3(p, gthick + amp * 1.6 + 4.);
+      vec3 grd = normalize(vec3((p - uMouse) * .00055, -1.));
+
+      float tPrev = 0., tHit = -1.;
+      vec3 nHit = vec3(0., 0., 1.);
+      float stepLen = max(amp * .16, 1.2);
+      for (int i = 0; i < 64; i++) {
+        float t = float(i) * stepLen;
+        vec3 q = gro + grd * t;
+        // Outside the panel's footprint there is no stone to hit.
+        if (scene(q.xy) > 0.) { tPrev = t; continue; }
+        vec3 nn;
+        float sz = crownZ(q.xy, gcut, amp, gthick, nn);
+        if (q.z <= sz) {
+          // Crossed it. Bisect for the exact facet plane.
+          float lo = tPrev, hi = t;
+          for (int k = 0; k < 6; k++) {
+            float mid = (lo + hi) * .5;
+            vec3 qm = gro + grd * mid;
+            vec3 nm;
+            float szm = crownZ(qm.xy, gcut, amp, gthick, nm);
+            if (qm.z <= szm) { hi = mid; nHit = nm; } else { lo = mid; }
+          }
+          tHit = hi;
+          break;
+        }
+        tPrev = t;
       }
 
-      if (!ghit) {
-        a = 0.;
+      if (tHit < 0.) {
+        a = 0.;                       // the ray passed over the stone
       } else {
-        vec3 q0 = gro + grd * gt;
-        vec3 N0 = gemNormal(q0, gthick, gcut);
-        float ndv0 = max(dot(N0, -grd), 1e-3);
-
-        // Diamond's F0 is about 0.17 — far brighter than glass, which is why a
-        // gem throws back so much light before you ever see into it.
-        vec3 F0 = vec3(.17);
-        vec3 Fr = F_Schlick(F0, ndv0);
-        vec3 refl = envmap(reflect(grd, N0), .02);
-
-        // Dispersion: three traces, one per channel, at slightly different
-        // indices. This is where the fire comes from — the same ray leaves by
-        // different facets depending on its wavelength.
-        vec3 through = vec3(0.);
-        for (int ch = 0; ch < 3; ch++) {
-          float ior = 2.417 + (float(ch) - 1.) * .022 * max(uDisp, .001) * 6.;
-          vec3 rd2 = refract(grd, N0, 1. / ior);
-          vec3 pos = q0 - N0 * .6;
-          vec3 outDir = rd2;
-          float path = 0.;
-          // Up to three internal bounces, which is where the sparkle lives.
-          for (int b = 0; b < 3; b++) {
-            float ti = 0.;
-            bool inside = false;
-            for (int i = 0; i < 48; i++) {
-              vec3 qq = pos + rd2 * ti;
-              float dd = -mapGem(qq, gthick, gcut);   // inside, the field is negative
-              if (dd < .25) { inside = true; break; }
-              ti += max(dd * .70, .30);
-              if (ti > gthick * 12.) break;
-            }
-            if (!inside) break;
-            pos = pos + rd2 * ti;
-            path += ti;
-            vec3 Ni = -gemNormal(pos, gthick, gcut);   // facing into the material
-            vec3 outv = refract(rd2, Ni, ior);
-            if (dot(outv, outv) < 1e-6) {
-              // Total internal reflection: the ray cannot leave here, so it
-              // stays in the stone and keeps going.
-              rd2 = reflect(rd2, Ni);
-              pos += rd2 * .8;
-            } else {
-              outDir = outv;
-              break;
-            }
-          }
-          // What that ray finally sees, and what the stone took out of it on
-          // the way (Beer-Lambert over the path it travelled).
-          vec3 far = mix(envmap(outDir, .0), toLinear(seen(p + outDir.xy * 190., 0.)), .45);
-          float absorb = exp(-path * .004);
-          through[ch] = far[ch] * absorb;
-        }
-        vec3 tint3 = toLinear(mix(vec3(1.), tcol, talpha * .7));
-        vec3 cr = through * tint3 * (1. - Fr) + refl * Fr;
-
-        // A hard specular on the entry facet, and the glint: facets nearly
-        // edge-on to the light flash, which is the discrete sparkle a gem has
-        // and a smooth highlight never does.
+        vec3 q0 = gro + grd * tHit;
+        vec3 Nf = nHit;
+        float ndv = max(dot(Nf, -grd), 1e-3);
+        float ndl = max(dot(Nf, Ldir), 0.);
         vec3 H = normalize(Ldir - grd);
-        float aa = .015 * .015;
-        float ndl0 = max(dot(N0, Ldir), 0.);
-        cr += F_Schlick(F0, max(dot(H, -grd), 0.))
-            * D_GGX(max(dot(N0, H), 0.), aa) * V_SmithGGX(ndv0, ndl0, aa) * ndl0 * 22. * uSpec;
-        plasma = toSrgb(tonemap(cr * 1.15));
+
+        // Shadow: march back toward the light across the crown. This is the
+        // thing a normal map can never do — one facet standing in another's
+        // light.
+        float shade = 1.;
+        for (int i = 1; i <= 10; i++) {
+          vec3 qs = q0 + Ldir * (float(i) * amp * .30);
+          vec3 nn;
+          float sz = crownZ(qs.xy, gcut, amp, gthick, nn);
+          if (qs.z < sz - .5 && scene(qs.xy) < 0.) { shade = .25; break; }
+        }
+
+        // Through the stone: refract in, cross the body, refract out at the
+        // underside.
+        float ior = 1.85;
+        vec3 rin = refract(grd, Nf, 1. / ior);
+        vec3 nn2;
+        float h2;
+        vec3 Nb2 = facetPlane((q0.xy + rin.xy * gthick * 2.) / gcut + 23.7, amp / gcut, h2);
+        vec3 rout = refract(rin, -Nb2, ior);
+        if (dot(rout, rout) < 1e-6) rout = reflect(rin, -Nb2);
+
+        float disp = .06 * max(uDisp, .001) * 6.;
+        vec2 off2 = rout.xy * gthick * 4.;
+        vec3 thru = toLinear(vec3(
+          seen(p + off2 * (1. + disp), fr).r,
+          seen(p + off2, fr).g,
+          seen(p + off2 * (1. - disp), fr).b
+        ));
+
+        vec3 body = toLinear(mix(vec3(.62, .48, .92), tcol, talpha));
+        vec3 lit = body * (.10 + 1.15 * ndl * shade);
+        lit += thru * body * 1.2 * (.25 + .75 * ndv);
+
+        vec3 F0 = vec3(.13);
+        float fres = pow(1. - ndv, 4.);
+        lit = mix(lit, envmap(reflect(grd, Nf), .02), F0.x + (1. - F0.x) * fres * .9);
+
+        float aa = .018 * .018;
+        lit += F_Schlick(F0, max(dot(H, -grd), 0.))
+             * D_GGX(max(dot(Nf, H), 0.), aa) * V_SmithGGX(ndv, ndl, aa) * ndl * 26. * uSpec * shade;
+        plasma = toSrgb(tonemap(lit));
         a = 1.;
       }
     } else if (uMat < 3.5) {
