@@ -24,6 +24,16 @@ export interface RendererSettings {
   highlight: number;
   /** Thin edge line strength. */
   edgeLine: number;
+  /** Slow iridescent sheen across the body of each surface. 0 = none. */
+  shimmer: number;
+  /** Colored bloom the plasma casts onto the background around it. 0 = none. */
+  glow: number;
+  /** How much the material tints what is seen through it. 0 = clear as water. */
+  wash: number;
+  /** Film grain over the background. 0 = none. */
+  grain: number;
+  /** Blur applied to the background only, in CSS px (0-40). Costs 8 extra blur passes when above 0. */
+  backgroundBlur: number;
   /** 0 = watery and bouncy, 1 = thick and slow. */
   viscosity: number;
   /** How far the surface trails behind moving panels. 0 = no trailing. */
@@ -60,6 +70,8 @@ export interface ShapeOptions {
   elevation?: number | null;
   /** When false, this surface never blends, bridges, or joins with others. Default true. */
   fuse?: boolean;
+  /** Snap only against surfaces carrying the same group. null groups with the other ungrouped surfaces. */
+  group?: string | null;
 }
 
 /** Handle returned by `register`, used by <Plasma>. */
@@ -105,7 +117,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -183,6 +195,13 @@ export class PlasmaRenderer {
   private floatOK = false;
   /** True between webglcontextlost and webglcontextrestored: draw nothing. */
   private lost = false;
+  private warnedOverflow = false;
+  /**
+   * Set by destroy(). The canvas and its context outlive this renderer, so an
+   * async callback that lands afterwards would happily allocate on a context
+   * nothing can free it from.
+   */
+  private destroyed = false;
   private resizeSettle: ReturnType<typeof setTimeout> | undefined;
   /** Everything initGL() created, so destroy() can free it by hand. */
   private owned: { tex: WebGLTexture[]; fb: WebGLFramebuffer[]; prog: WebGLProgram[]; buf: WebGLBuffer[] } = { tex: [], fb: [], prog: [], buf: [] };
@@ -216,13 +235,13 @@ export class PlasmaRenderer {
   private blend = 40;
   private lightQuery = typeof matchMedia !== "undefined" ? matchMedia("(prefers-color-scheme: light)") : null;
   private max: number;
-  private P: Float32Array;
-  private R: Float32Array;
-  private F: Float32Array;
-  private T: Float32Array;
-  private FR: Float32Array;
-  private EL: Float32Array;
-  private SOLO: Float32Array;
+  private P!: Float32Array;
+  private R!: Float32Array;
+  private F!: Float32Array;
+  private T!: Float32Array;
+  private FR!: Float32Array;
+  private EL!: Float32Array;
+  private SOLO!: Float32Array;
   private tintCache = new Map<string, [number, number, number]>();
   private RP = new Float32Array(MAX_PULSES * 4);
   settings: RendererSettings;
@@ -237,13 +256,7 @@ export class PlasmaRenderer {
   private constructor(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, settings: RendererSettings) {
     this.canvas = canvas; this.gl = gl; this.settings = settings;
     this.max = Math.max(1, Math.round(settings.maxSurfaces || DEFAULT_MAX_SHAPES));
-    this.P = new Float32Array(this.max * 4);
-    this.R = new Float32Array(this.max * 4);
-    this.F = new Float32Array(this.max);
-    this.T = new Float32Array(this.max * 4);
-    this.FR = new Float32Array(this.max);
-    this.EL = new Float32Array(this.max);
-    this.SOLO = new Float32Array(this.max);
+    this.allocUniformArrays();
     this.initGL();
     this.mouse.x = this.mouse.tx = innerWidth / 2;
     this.mouse.y = this.mouse.ty = innerHeight / 2;
@@ -278,7 +291,7 @@ export class PlasmaRenderer {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       this.imgTex = tex;
       const up = (source: TexImageSource, w: number, h: number) => {
-        if (!w || !h) return;
+        if (this.destroyed || !w || !h) return;
         gl.bindTexture(gl.TEXTURE_2D, this.imgTex);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, source);
@@ -292,7 +305,7 @@ export class PlasmaRenderer {
       } else {
         const img = src as HTMLImageElement;
         if (img.complete && img.naturalWidth) up(img, img.naturalWidth, img.naturalHeight);
-        else img.addEventListener("load", () => { if (this.imgSrc === src) up(img, img.naturalWidth, img.naturalHeight); }, { once: true });
+        else img.addEventListener("load", () => { if (!this.destroyed && this.imgSrc === src) up(img, img.naturalWidth, img.naturalHeight); }, { once: true });
       }
       return;
     }
@@ -303,7 +316,10 @@ export class PlasmaRenderer {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload = () => {
-      if (this.imgSrc !== src) return;
+      // A load can land after destroy(): the context is still alive (it
+      // belongs to the canvas, not to us), so this would allocate a texture
+      // with nothing left to free it.
+      if (this.destroyed || this.imgSrc !== src) return;
       const tex = gl.createTexture()!;
       gl.bindTexture(gl.TEXTURE_2D, tex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -322,7 +338,13 @@ export class PlasmaRenderer {
 
   configure(s: RendererSettings, immediate = false) {
     const qualityChanged = s.quality !== this.settings.quality;
+    const max = Math.max(1, Math.round(s.maxSurfaces || DEFAULT_MAX_SHAPES));
     this.settings = s;
+    // The surface budget is compiled into the shaders, so changing it means
+    // rebuilding every program. initGL() is the same path a context restore
+    // takes, so it is safe to re-enter - but the context is alive here, so
+    // what it is about to replace has to be freed first, or it all leaks.
+    if (max !== this.max) { this.setMax(max); return; }
     this.loadBackground(s.background ?? null);
     this.colorTarget = s.colors.map(hexToRgb);
     if (immediate) { this.colors = this.colorTarget.map(c => [...c]); this.blend = s.blend; }
@@ -348,12 +370,17 @@ export class PlasmaRenderer {
     };
   }
 
-  /** Layout boxes of all shapes (lean removed; animating draggables report their destination). */
-  layoutBoxes(excludeId?: number, fusingOnly = false): Box[] {
+  /**
+   * Layout boxes of all shapes (lean removed; animating draggables report
+   * their destination). Pass `group` to see only the surfaces in that group;
+   * omit it - as any caller written before groups existed does - to see them all.
+   */
+  layoutBoxes(excludeId?: number, fusingOnly = false, group?: string | null): Box[] {
     const out: Box[] = [];
     this.recs.forEach(r => {
       if (r.id === excludeId) return;
       if (fusingOnly && r.fuse === false) return;
+      if (group !== undefined && (r.group ?? null) !== group) return;
       out.push(this.layoutBoxOf(r));
     });
     return out;
@@ -384,6 +411,43 @@ export class PlasmaRenderer {
   /** Raise the material's energy (brightens contours and color); it decays on its own. */
   bump(e: number) { this.energy = Math.max(this.energy, Math.min(e, 1)); }
 
+  /** Rebuild the shaders and uniform arrays for a new surface budget. */
+  private setMax(max: number) {
+    this.max = max;
+    this.allocUniformArrays();
+    this.releaseGL();
+    this.initGL();
+    this.applyResize(); // initGL zeroes the canvas size, so this always reallocates
+    this.warnedOverflow = false;
+  }
+
+  private allocUniformArrays() {
+    this.P = new Float32Array(this.max * 4);
+    this.R = new Float32Array(this.max * 4);
+    this.F = new Float32Array(this.max);
+    this.T = new Float32Array(this.max * 4);
+    this.FR = new Float32Array(this.max);
+    this.EL = new Float32Array(this.max);
+    this.SOLO = new Float32Array(this.max);
+  }
+
+  /** Delete every GL object this renderer created, leaving the canvas usable. */
+  private releaseGL() {
+    const gl = this.gl;
+    if (!gl.isContextLost()) {
+      this.owned.tex.forEach(t => gl.deleteTexture(t));
+      this.owned.fb.forEach(f => gl.deleteFramebuffer(f));
+      this.owned.prog.forEach(pr => gl.deleteProgram(pr));
+      this.owned.buf.forEach(b => gl.deleteBuffer(b));
+      // Not in `owned`: loadBackground creates it, so nothing else would.
+      if (this.imgTex) gl.deleteTexture(this.imgTex);
+    }
+    this.imgTex = null;
+    this.imgSrc = null;
+    this.srcEl = null;
+    this.owned = { tex: [], fb: [], prog: [], buf: [] };
+  }
+
   /**
    * Every GL object this renderer owns. A lost context invalidates all of
    * them, so creation lives here rather than in the constructor: the restore
@@ -392,6 +456,16 @@ export class PlasmaRenderer {
   private initGL() {
     const gl = this.gl;
     this.owned = { tex: [], fb: [], prog: [], buf: [] };
+    // The background texture is created outside this method (loadBackground,
+    // often asynchronously), so it is not in `owned` and does not come back
+    // with everything else. On a restore its handle belongs to the dead
+    // context: drop the reference — deleting it is neither possible nor
+    // needed — and clear the source, or the configure() below early-returns
+    // on an unchanged src and the background is gone for good while uHasImg
+    // still says 1.
+    this.imgTex = null;
+    this.imgSrc = null;
+    this.srcEl = null;
     this.floatOK = !!gl.getExtension("EXT_color_buffer_float");
     const sh = makeShaders(this.max);
     this.progs = { bg: this.program(sh.bgFrag), mask: this.program(sh.maskFrag), tint: this.program(sh.tintFrag), blur: this.program(sh.blurFrag), comp: this.program(sh.compFrag) };
@@ -432,12 +506,19 @@ export class PlasmaRenderer {
   private onContextRestored = () => {
     this.lost = false;
     this.initGL();
-    this.applyResize();
     this.last = 0;
+    // initGL zeroes the canvas size so the next allocation always runs, but
+    // applyResize() refuses to do that work while frozen — which would leave
+    // every target without storage and mrtFb without attachments. The pinned
+    // image is a texture of the dead context anyway, so a freeze in flight is
+    // ended rather than kept; thaw() reallocates and restarts the loop.
+    if (this.frozen) { clearTimeout(this.scrollIdle); this.thaw(); return; }
+    this.applyResize();
     if (!document.hidden && !this.raf) this.raf = requestAnimationFrame(this.frame);
   };
 
   destroy() {
+    this.destroyed = true;
     cancelAnimationFrame(this.raf);
     clearTimeout(this.resizeSettle);
     this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
@@ -454,14 +535,7 @@ export class PlasmaRenderer {
     // testing sledgehammer: the <canvas> belongs to React and outlives this
     // renderer, so poisoning its context meant a remount — every StrictMode
     // mount in development — got a context that could never draw again.
-    const gl = this.gl;
-    if (!gl.isContextLost()) {
-      this.owned.tex.forEach(t => gl.deleteTexture(t));
-      this.owned.fb.forEach(f => gl.deleteFramebuffer(f));
-      this.owned.prog.forEach(pr => gl.deleteProgram(pr));
-      this.owned.buf.forEach(b => gl.deleteBuffer(b));
-    }
-    this.owned = { tex: [], fb: [], prog: [], buf: [] };
+    this.releaseGL();
   }
 
   /**
@@ -720,6 +794,10 @@ export class PlasmaRenderer {
     });
 
     this.drawnScroll = [scrollX, scrollY];
+    if (list.length > this.max && !this.warnedOverflow) {
+      this.warnedOverflow = true;
+      console.warn(`[plasma-ui] ${list.length} plasma surfaces are on screen but maxSurfaces is ${this.max}; the rest are not drawn. Raise maxSurfaces on <PlasmaProvider>.`);
+    }
     this.lastList = list.slice(0, this.max);
     this.draw(this.lastList);
   };
@@ -813,6 +891,24 @@ export class PlasmaRenderer {
     gl.useProgram(bl.pr);
     gl.uniform1i(bl.u.uTex, 0);
     gl.activeTexture(gl.TEXTURE0);
+    // Blur the background itself, before any surface is drawn: unlike frost,
+    // which blurs only what a frosted surface sees, this softens the whole
+    // field. It runs through the half-resolution scratch targets and lands
+    // back in rtBg, so every later pass - shadows, refraction, frost - reads
+    // the softened background with no extra work of its own.
+    const bgBlur = Math.min(40, Math.max(0, s.backgroundBlur || 0));
+    if (bgBlur > 0) {
+      const step = (bgBlur * this.dpr * MASK_SCALE) / 4;
+      pass(this.rtBg, this.rtBgM, 0, 0); // full res -> half res (the viewport is already half res)
+      for (let i = 0; i < 3; i++) {
+        pass(this.rtBgM, this.rtB, step, 0);
+        pass(this.rtB, this.rtBgM, 0, step);
+      }
+      gl.viewport(0, 0, this.rtBg.w, this.rtBg.h);
+      pass(this.rtBgM, this.rtBg, 0, 0); // and back up
+      gl.viewport(0, 0, this.rtA.w, this.rtA.h);
+    }
+
     // Which chains have anything to blur. Frost and elevation share a target
     // (frost in .r, elevation in .g), so that chain runs if either is set.
     const n = list.length;
@@ -876,6 +972,10 @@ export class PlasmaRenderer {
     gl.uniform1f(c.u.uRimWidth, s.rimWidth);
     gl.uniform1f(c.u.uSpec, s.highlight);
     gl.uniform1f(c.u.uHair, s.edgeLine);
+    gl.uniform1f(c.u.uShim, s.shimmer);
+    gl.uniform1f(c.u.uGlow, s.glow);
+    gl.uniform1f(c.u.uWash, s.wash);
+    gl.uniform1f(c.u.uGrain, s.grain);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.rtC.tex);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.rtA.tex);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.rtT.tex);
@@ -908,15 +1008,35 @@ export class PlasmaRenderer {
     const compile = (type: number, src: string) => {
       const sh = gl.createShader(type)!;
       gl.shaderSource(sh, src); gl.compileShader(sh);
-      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh) || "shader compile failed");
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        const log = gl.getShaderInfoLog(sh);
+        gl.deleteShader(sh);
+        throw new Error(log || "shader compile failed");
+      }
       return sh;
     };
     const pr = gl.createProgram()!;
-    gl.attachShader(pr, compile(gl.VERTEX_SHADER, vert));
-    gl.attachShader(pr, compile(gl.FRAGMENT_SHADER, fsrc));
-    gl.bindAttribLocation(pr, 0, "p");
-    gl.linkProgram(pr);
-    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr) || "program link failed");
+    // Shader objects outlive the call that compiled them: a program holds a
+    // reference, and deleteProgram() alone does not free one that was never
+    // flagged. Ten of them stranded per initGL() — once per StrictMode
+    // remount and once per context restore. Detach and delete here and the
+    // program is the only thing left to free.
+    const attached: WebGLShader[] = [];
+    try {
+      const vs = compile(gl.VERTEX_SHADER, vert);
+      let fs: WebGLShader;
+      try { fs = compile(gl.FRAGMENT_SHADER, fsrc); } catch (e) { gl.deleteShader(vs); throw e; }
+      gl.attachShader(pr, vs); attached.push(vs);
+      gl.attachShader(pr, fs); attached.push(fs);
+      gl.bindAttribLocation(pr, 0, "p");
+      gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr) || "program link failed");
+    } catch (e) {
+      gl.deleteProgram(pr);
+      throw e;
+    } finally {
+      attached.forEach(sh => { gl.detachShader(pr, sh); gl.deleteShader(sh); });
+    }
     const u: Prog["u"] = {};
     UNIFORMS.forEach(n => { u[n] = gl.getUniformLocation(pr, n); });
     this.owned.prog.push(pr);

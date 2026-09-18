@@ -18,7 +18,11 @@ const SHARE_IMAGE_ALT =
 
 /** Attribute values are quoted with ", so those and the entity starters escape. */
 const attr = (value) =>
-  String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
 /**
  * @param {object} page
@@ -29,7 +33,14 @@ const attr = (value) =>
  * @param {string} page.path    published path, which fixes the page's canonical URL
  * @param {string} page.outFile where the HTML is written
  */
-export async function buildPage({ entry, css, title, description, path = "index.html", outFile }) {
+export async function buildPage({
+  entry,
+  css,
+  title,
+  description,
+  path = "index.html",
+  outFile,
+}) {
   const out = await build({
     entryPoints: [entry],
     bundle: true,

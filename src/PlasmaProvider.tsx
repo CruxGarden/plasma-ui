@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BackgroundSource, PlasmaRenderer, RendererSettings } from "./renderer";
 import { Mood, MoodName, resolveMood } from "./moods";
 
@@ -24,6 +24,25 @@ export interface PlasmaProviderProps {
   highlight?: number;
   /** Strength of the thin line along the outline. 0 turns it off. Default 1. */
   edgeLine?: number;
+  /**
+   * The slow iridescent sheen that drifts across the body of each surface.
+   * 0 turns it off. Default 1. Set it to 0 along with `rim`, `highlight`,
+   * `edgeLine`, `glow` and `wash` for plain water - see "Clear as water" in
+   * the README.
+   */
+  shimmer?: number;
+  /** Colored bloom the plasma casts onto the background around it. 0 turns it off. Default 1. */
+  glow?: number;
+  /**
+   * How much of its own cast the material puts on what you see through it -
+   * a slight desaturation and lift. 0 passes the background through
+   * untouched. Default 1.
+   */
+  wash?: number;
+  /** Film grain over the background (never over the surfaces). 0 turns it off. Default 1. */
+  grain?: number;
+  /** Blur the background itself, in CSS px, 0-40. Softens the whole field, unlike `frost`, which blurs only what a frosted surface sees. Default 0. */
+  backgroundBlur?: number;
   /** How thick the material feels: 0 is watery and bouncy, 1 is slow like syrup. Also scales drag and snap springs. Default 0.5. */
   viscosity?: number;
   /** How far the plasma trails and stretches behind moving panels. 0 turns it off. Default 1. */
@@ -61,37 +80,90 @@ export interface PlasmaProviderProps {
    * if any, to scroll with the page.
    */
   freezeOnScroll?: boolean;
-  /** Maximum visible plasma surfaces. Compiled into the shaders, so it is fixed for the provider's lifetime; more surfaces cost GPU time. Default 16. */
+  /** Maximum visible plasma surfaces at once. Raising it costs GPU time; changing it rebuilds the shaders. Default 16. */
   maxSurfaces?: number;
-  /** z-index of the fixed canvas. Default -1 (behind content). */
+  /** z-index of the canvas this provider renders. Default -1 (behind content). Ignored when `canvas` is false. */
   zIndex?: number;
+  /**
+   * Whether the provider renders the canvas itself. Set false and place a
+   * `<PlasmaCanvas />` anywhere in the tree to control where the element
+   * lives and how it is styled. Default true.
+   */
+  canvas?: boolean;
 }
 
-export interface PlasmaContextValue {
+/**
+ * The parts of the context that exist for the provider's lifetime. This value
+ * is stable: it changes once when the renderer is created and then only if
+ * the reduced-motion preference does, so `usePlasmaRuntime()` consumers are
+ * not re-rendered by every styling change.
+ */
+export interface PlasmaRuntime {
   renderer: PlasmaRenderer | null;
-  /** Provider-level tint and opacity, used by the CSS fallback. */
-  tint: string;
-  opacity: number;
-  frost: number;
-  /** Provider-level default corner radius. */
-  radius: number;
   /** False when WebGL2 is unavailable; <Plasma> falls back to a CSS frosted panel. */
   supported: boolean;
-  grid: number;
-  magnet: number;
-  spring: Mood["spring"];
   reducedMotion: boolean;
   pulse: (x: number, y: number, strength?: number) => void;
   bump: (energy: number) => void;
 }
 
-const noop = () => {};
-const PlasmaContext = createContext<PlasmaContextValue>({
-  renderer: null, tint: "#ffffff", opacity: 0, frost: 0, radius: 26, supported: false, grid: 24, magnet: 40,
-  spring: { stiffness: 170, damping: 16 }, reducedMotion: false, pulse: noop, bump: noop,
-});
+/** The provider-level values a surface falls back to, and the layout settings. */
+export interface PlasmaDefaults {
+  tint: string;
+  opacity: number;
+  frost: number;
+  radius: number;
+  grid: number;
+  magnet: number;
+  spring: Mood["spring"];
+}
 
-export const usePlasma = () => useContext(PlasmaContext);
+/** Everything `usePlasma()` returns: the runtime and the defaults together. */
+export interface PlasmaContextValue extends PlasmaRuntime, PlasmaDefaults {}
+
+const noop = () => {};
+const DEFAULT_RUNTIME: PlasmaRuntime = { renderer: null, supported: false, reducedMotion: false, pulse: noop, bump: noop };
+const DEFAULT_DEFAULTS: PlasmaDefaults = {
+  tint: "#ffffff", opacity: 0, frost: 0, radius: 26, grid: 24, magnet: 40,
+  spring: { stiffness: 170, damping: 16 },
+};
+
+const RuntimeContext = createContext<PlasmaRuntime>(DEFAULT_RUNTIME);
+const DefaultsContext = createContext<PlasmaDefaults>(DEFAULT_DEFAULTS);
+/** Set by the provider; a <PlasmaCanvas> hands its element back through this. */
+const AttachContext = createContext<((el: HTMLCanvasElement | null) => void) | null>(null);
+
+/** Renderer, support flag and commands. Stable - use this when you only need `pulse`. */
+export const usePlasmaRuntime = () => useContext(RuntimeContext);
+/** Provider-level tint, opacity, frost, radius, grid, magnet and spring. */
+export const usePlasmaDefaults = () => useContext(DefaultsContext);
+
+/** Everything at once. Re-renders on any provider change; prefer the narrower hooks. */
+export function usePlasma(): PlasmaContextValue {
+  const runtime = usePlasmaRuntime();
+  const defaults = usePlasmaDefaults();
+  return useMemo(() => ({ ...runtime, ...defaults }), [runtime, defaults]);
+}
+
+// Declared locally so the library needs no @types/node, while the expression
+// below stays the literal text every bundler substitutes - so the dev-only
+// warnings drop out of a production build entirely.
+declare const process: { env: { NODE_ENV?: string } } | undefined;
+/** True in every build except a production one. */
+export const DEV = typeof process !== "undefined" && process.env.NODE_ENV !== "production";
+
+/**
+ * useLayoutEffect on the client, useEffect on the server - React warns about
+ * the former during SSR, and none of this work means anything there anyway.
+ */
+export const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/** Keeps a ref pointing at the newest value without writing to it during render. */
+export function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  useIsoLayoutEffect(() => { ref.current = value; });
+  return ref;
+}
 
 const FALLBACK_CSS = `
 .plasma-panel{box-sizing:border-box}
@@ -116,13 +188,54 @@ function useReducedMotion() {
   return reduced;
 }
 
+export interface PlasmaCanvasProps {
+  className?: string;
+  style?: React.CSSProperties;
+  /** z-index of the canvas. Default -1 (behind content). */
+  zIndex?: number;
+}
+
+/**
+ * The canvas the plasma is drawn on. The provider renders one by default;
+ * render this yourself (with `canvas={false}` on the provider) to choose
+ * where the element sits in the DOM and how it is styled.
+ *
+ * The drawn region is still the whole viewport - this controls the element,
+ * not the area the renderer covers. Clipping the field to a container is not
+ * supported yet.
+ */
+export function PlasmaCanvas({ className, style, zIndex = -1 }: PlasmaCanvasProps) {
+  const attach = useContext(AttachContext);
+  const { supported } = usePlasmaRuntime();
+  useEffect(() => {
+    if (DEV && !attach) console.warn("[plasma-ui] <PlasmaCanvas> must be rendered inside a <PlasmaProvider>.");
+  }, [attach]);
+  return (
+    <canvas
+      ref={attach ?? undefined}
+      aria-hidden="true"
+      className={className}
+      style={{
+        position: "fixed", inset: 0, width: "100%", height: "100%", zIndex,
+        pointerEvents: "none", display: supported ? "block" : "none",
+        ...style,
+      }}
+    />
+  );
+}
+
 export function PlasmaProvider({
   children, mood = "tidal", theme = "auto", blend, refraction = 1, dispersion = 1, rim = 1, smoothness = 1,
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
+  shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0,
   pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
-  freezeOnScroll = false,
+  freezeOnScroll = false, canvas = true,
 }: PlasmaProviderProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  // The canvas arrives through a callback ref - from the one below, or from a
+  // <PlasmaCanvas> the consumer placed. Children commit before this component's
+  // own effects run, so either way the element is here by the time the
+  // renderer is created.
+  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null);
   const [renderer, setRenderer] = useState<PlasmaRenderer | null>(null);
   const [supported, setSupported] = useState(true);
   const reducedMotion = useReducedMotion();
@@ -131,48 +244,69 @@ export function PlasmaProvider({
   const settings: RendererSettings = {
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
     pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
-    rimColor, rimWidth, highlight, edgeLine, viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
+    rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur,
+    viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };
-  const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  const settingsRef = useLatest(settings);
 
-  useLayoutEffect(() => {
-    const r = PlasmaRenderer.create(canvasRef.current!, settingsRef.current);
+  useIsoLayoutEffect(() => {
+    if (!canvasEl) return;
+    const r = PlasmaRenderer.create(canvasEl, settingsRef.current);
     if (!r) { setSupported(false); return; }
+    setSupported(true);
     setRenderer(r);
     return () => { r.destroy(); setRenderer(null); };
-  }, []);
+    // settingsRef is a stable ref; the renderer picks up later changes through configure().
+  }, [canvasEl]);
 
-  useEffect(() => { renderer?.configure(settings); }, [
-    renderer, m.colors.join(), settings.blend, refraction, dispersion, rim, smoothness,
-    settings.pointerDrop, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
-    rimColor, rimWidth, highlight, edgeLine, viscosity, stretch, flow, frost, elevation, background,
-  ]);
+  useEffect(() => {
+    if (!DEV || canvasEl) return;
+    // Deferred by a tick: with canvas={false} a <PlasmaCanvas> child attaches
+    // during the same commit, and this would fire before it did.
+    const t = setTimeout(() => console.warn("[plasma-ui] PlasmaProvider has no canvas. Either leave `canvas` on, or render a <PlasmaCanvas /> inside the provider."), 0);
+    return () => clearTimeout(t);
+  }, [canvasEl]);
+
+  // Every renderer setting flattened to a primitive. Deriving the dependencies
+  // from the settings object instead of listing them by hand means a new field
+  // goes live the moment it is added: the hand-written list had to be edited
+  // in lockstep, and a missed entry silently froze that prop at its mount
+  // value with nothing to catch it. `settings` is a fixed object literal, so
+  // this array's length and order are the same on every render.
+  const settingsDeps = Object.values(settings).map(v => (Array.isArray(v) ? v.join() : v));
+  useEffect(() => { renderer?.configure(settings); }, [renderer, ...settingsDeps]);
 
   // Viscosity scales the UI springs too: thinner is snappier and bouncier, thicker is slower and calmer.
   const vis = Math.min(Math.max(viscosity, 0), 1);
   const stiffK = vis < 0.5 ? 1.6 - 1.2 * vis : 1 - 1.1 * (vis - 0.5);
   const dampK = vis < 0.5 ? 0.6 + 0.8 * vis : 1 + 1.6 * (vis - 0.5);
-  const spring = { stiffness: m.spring.stiffness * stiffK, damping: m.spring.damping * dampK * Math.sqrt(stiffK) };
+  const stiffness = m.spring.stiffness * stiffK;
+  const damping = m.spring.damping * dampK * Math.sqrt(stiffK);
 
-  const value = useMemo<PlasmaContextValue>(() => ({
-    renderer, tint, opacity, frost, radius, supported, grid, magnet, spring, reducedMotion,
-    pulse: (x, y, s) => renderer?.pulse(x, y, s),
-    bump: e => renderer?.bump(e),
-  }), [renderer, tint, opacity, frost, radius, supported, grid, magnet, spring.stiffness, spring.damping, reducedMotion]);
+  // pulse and bump read the renderer through a ref, so the runtime value does
+  // not change identity when the renderer is replaced mid-session.
+  const rendererRef = useLatest(renderer);
+  const pulse = useCallback<PlasmaRuntime["pulse"]>((x, y, s) => rendererRef.current?.pulse(x, y, s), []);
+  const bump = useCallback<PlasmaRuntime["bump"]>(e => rendererRef.current?.bump(e), []);
+
+  const runtime = useMemo<PlasmaRuntime>(
+    () => ({ renderer, supported, reducedMotion, pulse, bump }),
+    [renderer, supported, reducedMotion, pulse, bump],
+  );
+  const defaults = useMemo<PlasmaDefaults>(
+    () => ({ tint, opacity, frost, radius, grid, magnet, spring: { stiffness, damping } }),
+    [tint, opacity, frost, radius, grid, magnet, stiffness, damping],
+  );
 
   return (
-    <PlasmaContext.Provider value={value}>
-      <style>{FALLBACK_CSS}</style>
-      <canvas
-        ref={canvasRef}
-        aria-hidden="true"
-        style={{
-          position: "fixed", inset: 0, width: "100%", height: "100%", zIndex,
-          pointerEvents: "none", display: supported ? "block" : "none",
-        }}
-      />
-      {children}
-    </PlasmaContext.Provider>
+    <RuntimeContext.Provider value={runtime}>
+      <DefaultsContext.Provider value={defaults}>
+        <AttachContext.Provider value={setCanvasEl}>
+          <style>{FALLBACK_CSS}</style>
+          {canvas && <PlasmaCanvas zIndex={zIndex} />}
+          {children}
+        </AttachContext.Provider>
+      </DefaultsContext.Provider>
+    </RuntimeContext.Provider>
   );
 }

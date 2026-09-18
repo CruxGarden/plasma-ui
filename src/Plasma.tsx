@@ -1,14 +1,13 @@
-import React, { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { animateSpring, springValue } from "./spring";
-import { usePlasma } from "./PlasmaProvider";
-import { JoinedSides, ShapeHandle } from "./renderer";
+import React, { forwardRef, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { animateSpring, SpringValue, springValue } from "./spring";
+import { DEV, useIsoLayoutEffect, useLatest, usePlasmaDefaults, usePlasmaRuntime } from "./PlasmaProvider";
+import { JoinedSides, ShapeHandle, ShapeOptions } from "./renderer";
 import { Box, snapBox } from "./snap";
 
 export interface Offset { x: number; y: number }
 
-export interface PlasmaProps extends Omit<React.HTMLAttributes<HTMLElement>, "onDragStart" | "onDragEnd"> {
-  /** Element to render. Default "div". */
-  as?: React.ElementType;
+/** The props Plasma itself understands. Everything else goes to the rendered element. */
+export interface PlasmaOwnProps {
   /** Corner radius in px. Defaults to the provider's radius. */
   radius?: number;
   /** How far (px) the surface leans toward the pointer while standalone. 0 or false disables. Default 10. */
@@ -29,8 +28,19 @@ export interface PlasmaProps extends Omit<React.HTMLAttributes<HTMLElement>, "on
   draggable?: boolean;
   /** Snap on release (edges latch to neighbors, otherwise the grid). Default true. */
   snap?: boolean;
-  /** Keep dragging inside this element. Defaults to the viewport. Also sets the grid origin. */
-  bounds?: React.RefObject<HTMLElement>;
+  /**
+   * Only snap against surfaces carrying the same group. Two independent sets
+   * of panels on one page stop latching onto each other. Surfaces with no
+   * group form one group of their own. Scopes snapping only - surfaces still
+   * fuse visually wherever they overlap.
+   */
+  group?: string;
+  /**
+   * Keep dragging inside this element. Defaults to the viewport. Also sets the
+   * grid origin. The `| null` matters: under @types/react 19 `useRef<T>(null)`
+   * is a `RefObject<T | null>`, which a bare `RefObject<HTMLElement>` rejects.
+   */
+  bounds?: React.RefObject<HTMLElement | null>;
   /** Controlled offset from the element's layout position. Changes spring into place. */
   offset?: Offset;
   /** Starting offset when uncontrolled. */
@@ -42,7 +52,36 @@ export interface PlasmaProps extends Omit<React.HTMLAttributes<HTMLElement>, "on
   onJoinChange?: (joined: boolean) => void;
 }
 
+/**
+ * Props for `<Plasma as={C}>`: Plasma's own, plus everything `C` accepts.
+ * `PlasmaProps` on its own still means the div form, as it always did.
+ */
+export type PlasmaProps<C extends React.ElementType = "div"> = PlasmaOwnProps & {
+  /** Element or component to render. Default "div". */
+  as?: C;
+  ref?: React.Ref<HTMLElement>;
+} & Omit<React.ComponentPropsWithoutRef<C>, keyof PlasmaOwnProps | "as" | "ref">;
+
 const NO_DRAG = "button,a,input,textarea,select,label,[contenteditable],[data-plasma-nodrag]";
+const NO_SIDES: JoinedSides = { top: false, right: false, bottom: false, left: false };
+const noSides = () => NO_SIDES;
+
+/**
+ * The join state arrives from the renderer's frame loop, which is an external
+ * store, not React state. Reading it through useSyncExternalStore keeps it
+ * tear-free under concurrent rendering, and the subscribe/getSnapshot pair is
+ * stable from the first render even though the renderer handle it is fed by
+ * only exists after the registration effect.
+ */
+function createSidesStore() {
+  let value = NO_SIDES;
+  const subs = new Set<() => void>();
+  return {
+    subscribe(fn: () => void) { subs.add(fn); return () => { subs.delete(fn); }; },
+    get: () => value,
+    set(next: JoinedSides) { value = next; subs.forEach(fn => fn()); },
+  };
+}
 
 function fallbackTint(hex: string, a: number): React.CSSProperties | null {
   if (!(a > 0) || !/^#([0-9a-f]{6})$/i.test(hex)) return null;
@@ -55,38 +94,62 @@ function assignRef<T>(ref: React.ForwardedRef<T>, v: T | null) {
   else if (ref) ref.current = v;
 }
 
-export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
+/** Lazily create a per-instance value without re-creating it on every render. */
+function useConst<T>(make: () => T): T {
+  const ref = useRef<T | null>(null);
+  if (ref.current === null) ref.current = make();
+  return ref.current;
+}
+
+type PlasmaInnerProps = PlasmaOwnProps & { as?: React.ElementType } & Record<string, unknown>;
+
+const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   {
-    as: Comp = "div", radius, lean = 10, tint, opacity, frost, elevation, fuse, padding, draggable = false, snap = true, bounds,
+    as: Comp = "div", radius, lean = 10, tint, opacity, frost, elevation, fuse, padding, draggable = false, snap = true, group, bounds,
     offset, defaultOffset, onDragStart, onDragEnd, onJoinChange,
     className, style, children, onPointerDown, onKeyDown, tabIndex, ...rest
-  },
+  }: PlasmaInnerProps,
   ref,
 ) {
-  const plasma = usePlasma();
-  const r = radius ?? plasma.radius;
+  const runtime = usePlasmaRuntime();
+  const defaults = usePlasmaDefaults();
+  const r = radius ?? defaults.radius;
   const el = useRef<HTMLElement | null>(null);
   const handle = useRef<ShapeHandle | null>(null);
-  const [x] = useState(() => springValue(offset?.x ?? defaultOffset?.x ?? 0));
-  const [y] = useState(() => springValue(offset?.y ?? defaultOffset?.y ?? 0));
+  const x = useConst<SpringValue>(() => springValue(offset?.x ?? defaultOffset?.x ?? 0));
+  const y = useConst<SpringValue>(() => springValue(offset?.y ?? defaultOffset?.y ?? 0));
   const dest = useRef<Offset>({ x: x.get(), y: y.get() });
   const anims = useRef<{ stop: () => void }[]>([]);
   const [dragging, setDragging] = useState(false);
   const positioned = draggable || !!offset || !!defaultOffset;
 
-  const joinCb = useRef(onJoinChange);
-  joinCb.current = onJoinChange;
-  const [sides, setSides] = useState<JoinedSides>({ top: false, right: false, bottom: false, left: false });
-  const plasmaRef = useRef(plasma);
-  plasmaRef.current = plasma;
+  const joinCb = useLatest(onJoinChange);
+  const sidesStore = useConst(createSidesStore);
+  const sides = useSyncExternalStore(sidesStore.subscribe, sidesStore.get, noSides);
+  const runtimeRef = useLatest(runtime);
+  const defaultsRef = useLatest(defaults);
+  const boundsRef = useLatest(bounds);
+  const snapRef = useLatest(snap);
+  const onDragEndRef = useLatest(onDragEnd);
+  const onDragStartRef = useLatest(onDragStart);
+
+  // Registration reads the options through a ref rather than closing over
+  // them: the effect only re-runs when the renderer or `positioned` changes,
+  // so a prop that moved in between would otherwise draw one stale frame
+  // before the update effect below corrected it.
+  const opts: ShapeOptions = {
+    radius: r, lean: lean || 0, tint: tint ?? null, opacity: opacity ?? null,
+    frost: frost ?? null, elevation: elevation ?? null, fuse, group: group ?? null,
+  };
+  const optsRef = useLatest(opts);
 
   const setRef = useCallback((node: HTMLElement | null) => { el.current = node; assignRef(ref, node); }, [ref]);
 
   // Register with the renderer.
-  useLayoutEffect(() => {
-    const node = el.current, ren = plasma.renderer;
+  useIsoLayoutEffect(() => {
+    const node = el.current, ren = runtime.renderer;
     if (!node || !ren) return;
-    const h = ren.register(node, { radius: r, lean: lean || 0, tint: tint ?? null, opacity: opacity ?? null, frost: frost ?? null, elevation: elevation ?? null, fuse }, j => joinCb.current?.(j), setSides);
+    const h = ren.register(node, optsRef.current, j => joinCb.current?.(j), sidesStore.set);
     if (positioned) {
       h.setLayoutBox(() => {
         const rect = node.getBoundingClientRect();
@@ -101,14 +164,16 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
     }
     handle.current = h;
     return () => { h.remove(); handle.current = null; };
-  }, [plasma.renderer, positioned]);
+  }, [runtime.renderer, positioned]);
 
-  useEffect(() => {
-    handle.current?.update({ radius: r, lean: lean || 0, tint: tint ?? null, opacity: opacity ?? null, frost: frost ?? null, elevation: elevation ?? null, fuse });
-  }, [r, lean, tint, opacity, frost, elevation, fuse]);
+  // Layout, not passive: a radius change must reach the renderer in the same
+  // commit as the CSS borderRadius it accompanies, or the two disagree for a frame.
+  useIsoLayoutEffect(() => {
+    handle.current?.update(opts);
+  }, [r, lean, tint, opacity, frost, elevation, fuse, group]);
 
   // Write the offset as a transform (lean and pulse use the separate translate/scale properties).
-  useLayoutEffect(() => {
+  useIsoLayoutEffect(() => {
     const node = el.current;
     if (!node || !positioned) return;
     const apply = () => { node.style.transform = `translate3d(${x.get()}px, ${y.get()}px, 0)`; };
@@ -120,10 +185,10 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
   const springTo = useCallback((tx: number, ty: number, vx = 0, vy = 0) => {
     dest.current = { x: tx, y: ty };
     anims.current.forEach(a => a.stop());
-    const { spring, reducedMotion } = plasmaRef.current;
-    if (reducedMotion) { x.set(tx); y.set(ty); anims.current = []; return; }
-    const opts = { stiffness: spring.stiffness, damping: spring.damping };
-    anims.current = [animateSpring(x, tx, { ...opts, velocity: vx }), animateSpring(y, ty, { ...opts, velocity: vy })];
+    const { spring } = defaultsRef.current;
+    if (runtimeRef.current.reducedMotion) { x.set(tx); y.set(ty); anims.current = []; return; }
+    const o = { stiffness: spring.stiffness, damping: spring.damping };
+    anims.current = [animateSpring(x, tx, { ...o, velocity: vx }), animateSpring(y, ty, { ...o, velocity: vy })];
   }, []);
 
   // Controlled offset.
@@ -135,16 +200,28 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
 
   useEffect(() => () => anims.current.forEach(a => a.stop()), []);
 
-  const boundsBox = (): Box => {
-    const b = bounds?.current?.getBoundingClientRect();
-    return b ? { l: b.left, t: b.top, w: b.width, h: b.height } : { l: 0, t: 0, w: innerWidth, h: innerHeight };
-  };
+  useEffect(() => {
+    if (!DEV) return;
+    if (!runtime.renderer && runtime.supported) {
+      console.warn("[plasma-ui] <Plasma> rendered outside a <PlasmaProvider>: it will draw as the plain CSS fallback.");
+    }
+    const s = style as React.CSSProperties | undefined;
+    if (positioned && s && ("transform" in s || "translate" in s || "scale" in s)) {
+      console.warn("[plasma-ui] <Plasma> owns transform, translate and scale on its element. A `style` that sets any of them will fight the drag and lean animations.");
+    }
+  }, [runtime.renderer, runtime.supported, positioned, style]);
 
-  const settle = (proposed: Offset, vx = 0, vy = 0) => {
+  const boundsBox = useCallback((): Box => {
+    const b = boundsRef.current?.current?.getBoundingClientRect();
+    return b ? { l: b.left, t: b.top, w: b.width, h: b.height } : { l: 0, t: 0, w: innerWidth, h: innerHeight };
+  }, []);
+
+  const settle = useCallback((proposed: Offset, vx = 0, vy = 0) => {
     const node = el.current!, h = handle.current;
-    const { grid, magnet, renderer } = plasmaRef.current;
+    const { grid, magnet } = defaultsRef.current;
+    const { renderer } = runtimeRef.current;
     let target = proposed;
-    if (snap && h && renderer) {
+    if (snapRef.current && h && renderer) {
       const rect = node.getBoundingClientRect();
       const w = node.offsetWidth, hh = node.offsetHeight;
       const lo = h.leanOffset();
@@ -152,17 +229,17 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
       const baseT = rect.top + (rect.height - hh) / 2 - lo.y - y.get();
       const s = snapBox(
         { l: baseL + proposed.x, t: baseT + proposed.y, w, h: hh },
-        renderer.layoutBoxes(h.id, true),
-        { grid, magnet, bounds: boundsBox(), inset: bounds ? 0 : 8 },
+        renderer.layoutBoxes(h.id, true, optsRef.current.group ?? null),
+        { grid, magnet, bounds: boundsBox(), inset: boundsRef.current ? 0 : 8 },
       );
       target = { x: s.l - baseL, y: s.t - baseT };
     }
     springTo(target.x, target.y, vx, vy);
-    onDragEnd?.(target);
-  };
+    onDragEndRef.current?.(target);
+  }, []);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
-    onPointerDown?.(e);
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+    (onPointerDown as ((e: React.PointerEvent<HTMLElement>) => void) | undefined)?.(e);
     if (!draggable || e.defaultPrevented || e.button !== 0) return;
     if ((e.target as HTMLElement).closest(NO_DRAG)) return;
     const node = el.current!;
@@ -181,13 +258,13 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
 
     handle.current?.setDragging(true);
     setDragging(true);
-    onDragStart?.();
+    onDragStartRef.current?.();
 
     const move = (ev: PointerEvent) => {
       x.set(clamp(start.x + ev.clientX - start.px, minX - 40, maxX + 40));
       y.set(clamp(start.y + ev.clientY - start.py, minY - 40, maxY + 40));
       dest.current = { x: x.get(), y: y.get() };
-      plasmaRef.current.bump(Math.hypot(x.getVelocity(), y.getVelocity()) / 1800);
+      runtimeRef.current.bump(Math.hypot(x.getVelocity(), y.getVelocity()) / 1800);
     };
     const up = () => {
       node.removeEventListener("pointermove", move);
@@ -201,19 +278,19 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
     node.addEventListener("pointermove", move);
     node.addEventListener("pointerup", up);
     node.addEventListener("pointercancel", up);
-  };
+  }, [draggable, onPointerDown]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
-    onKeyDown?.(e);
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
+    (onKeyDown as ((e: React.KeyboardEvent<HTMLElement>) => void) | undefined)?.(e);
     if (!draggable || e.defaultPrevented || e.target !== el.current) return;
-    const step = plasmaRef.current.grid || 24;
+    const step = defaultsRef.current.grid || 24;
     const d = ({ ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as Record<string, number[]>)[e.key];
     if (!d) return;
     e.preventDefault();
     settle({ x: dest.current.x + d[0], y: dest.current.y + d[1] });
-  };
+  }, [draggable, onKeyDown]);
 
-  const classes = ["plasma-panel", plasma.supported ? "" : "plasma-fallback", className].filter(Boolean).join(" ");
+  const classes = ["plasma-panel", runtime.supported ? "" : "plasma-fallback", className].filter(Boolean).join(" ");
 
   return (
     <Comp
@@ -225,17 +302,27 @@ export const Plasma = forwardRef<HTMLElement, PlasmaProps>(function Plasma(
           padding: `${sides.top ? padding / 2 : padding}px ${sides.right ? padding / 2 : padding}px ${sides.bottom ? padding / 2 : padding}px ${sides.left ? padding / 2 : padding}px`,
           transition: "padding 250ms ease",
         }),
-        ...(plasma.supported ? null : fallbackTint(tint ?? plasma.tint, opacity ?? plasma.opacity)),
-        ...style,
+        ...(runtime.supported ? null : fallbackTint(tint ?? defaults.tint, opacity ?? defaults.opacity)),
+        ...(style as React.CSSProperties | undefined),
       }}
       data-plasma-draggable={draggable || undefined}
       data-plasma-dragging={dragging || undefined}
-      tabIndex={tabIndex ?? (draggable ? 0 : undefined)}
+      tabIndex={(tabIndex as number | undefined) ?? (draggable ? 0 : undefined)}
       onPointerDown={handlePointerDown}
       onKeyDown={handleKeyDown}
       {...rest}
     >
-      {children}
+      {children as React.ReactNode}
     </Comp>
   );
 });
+
+/**
+ * A plasma surface. The DOM stays ordinary HTML; the canvas only draws.
+ *
+ * The cast is what makes `as` polymorphic: `<Plasma as="a" href=...>` and
+ * `<Plasma as={Link} to=...>` typecheck, which a plain forwardRef cannot express.
+ */
+export const Plasma = PlasmaInner as unknown as <C extends React.ElementType = "div">(
+  props: PlasmaProps<C>,
+) => React.ReactElement | null;

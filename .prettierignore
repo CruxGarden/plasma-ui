@@ -4,3 +4,12 @@ site/dist
 coverage
 node_modules
 package-lock.json
+
+# Written in a deliberately dense style - many short statements or
+# declarations per line, shader strings laid out to read as GLSL. Reformatting
+# would churn every line for no gain and bury real diffs. Everything Prettier
+# does own is covered by `npm run format:check`.
+src
+tests
+*.md
+*.css

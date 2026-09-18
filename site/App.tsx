@@ -30,6 +30,11 @@ interface Settings {
   rimWidth: number;
   highlight: number;
   edgeLine: number;
+  shimmer: number;
+  glow: number;
+  wash: number;
+  grain: number;
+  backgroundBlur: number;
   smoothness: number;
   pointerDrop: boolean;
   ambientDrops: boolean;
@@ -60,6 +65,11 @@ const DEFAULTS: Settings = {
   rimWidth: 1,
   highlight: 1,
   edgeLine: 1,
+  shimmer: 1,
+  glow: 1,
+  wash: 1,
+  grain: 1,
+  backgroundBlur: 0,
   smoothness: 1,
   pointerDrop: true,
   ambientDrops: false,
@@ -91,6 +101,11 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 1,
       rimWidth: 1,
       highlight: 1,
+      shimmer: 1,
+      glow: 1,
+      wash: 1,
+      grain: 1,
+      backgroundBlur: 0,
       edgeLine: 1,
       viscosity: 0.5,
       stretch: 1,
@@ -118,6 +133,11 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 0.25,
       rimWidth: 0.7,
       highlight: 0.4,
+      shimmer: 0.6,
+      glow: 0.5,
+      wash: 1,
+      grain: 1,
+      backgroundBlur: 0,
       edgeLine: 0.8,
       viscosity: 0.7,
       stretch: 0.4,
@@ -144,6 +164,11 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 0.5,
       rimWidth: 0.6,
       highlight: 0,
+      shimmer: 0,
+      glow: 0,
+      wash: 0,
+      grain: 0.4,
+      backgroundBlur: 0,
       edgeLine: 0.6,
       viscosity: 0.6,
       stretch: 0,
@@ -153,6 +178,38 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       dispersion: 0,
       smoothness: 1,
       elevation: 0.12,
+      ambientDrops: false,
+    },
+  },
+  {
+    name: "Aqua",
+    blurb: "Clear as water. Every sheen off, only the lens remains.",
+    patch: {
+      mood: "tidal",
+      tint: "#ffffff",
+      opacity: 0,
+      frost: 0,
+      panelColors: false,
+      rimStyle: "iridescent",
+      rimHex: "#9ff3e4",
+      // The six controls that give the material a look of its own, all off.
+      rim: 0,
+      shimmer: 0,
+      glow: 0,
+      wash: 0,
+      grain: 0,
+      highlight: 0,
+      edgeLine: 0.35, // a hairline is what still reads as an edge once the rim is gone
+      rimWidth: 1,
+      backgroundBlur: 0,
+      viscosity: 0.35,
+      stretch: 1,
+      flow: 0.4,
+      blend: 40,
+      refraction: 1.5,
+      dispersion: 1.6,
+      smoothness: 1,
+      elevation: 0,
       ambientDrops: false,
     },
   },
@@ -170,6 +227,11 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 1.6,
       rimWidth: 1.3,
       highlight: 0.6,
+      shimmer: 1.4,
+      glow: 1.4,
+      wash: 1,
+      grain: 1,
+      backgroundBlur: 0,
       edgeLine: 1.4,
       viscosity: 0.15,
       stretch: 1.2,
@@ -195,6 +257,11 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 1.3,
       rimWidth: 1.4,
       highlight: 1,
+      shimmer: 1.6,
+      glow: 1.4,
+      wash: 1,
+      grain: 1,
+      backgroundBlur: 0,
       edgeLine: 1,
       viscosity: 0,
       stretch: 2.5,
@@ -277,6 +344,11 @@ export function App() {
       rimWidth={s.rimWidth}
       highlight={s.highlight}
       edgeLine={s.edgeLine}
+      shimmer={s.shimmer}
+      glow={s.glow}
+      wash={s.wash}
+      grain={s.grain}
+      backgroundBlur={s.backgroundBlur}
       pointerDrop={s.pointerDrop}
       ambientDrops={s.ambientDrops}
       grid={s.grid}
@@ -389,6 +461,10 @@ function Hero() {
               Send a pulse
             </button>
           </div>
+          <p className="hero-note">
+            For the best experience, use a desktop browser or app. The effect is
+            GPU-heavy and does not run well on mobile.
+          </p>
         </Plasma>
         <Plasma className="hero-install" radius={36}>
           <code>npm install @cruxgarden/plasma-ui</code>
@@ -791,6 +867,54 @@ function Playground({
               onChange={(v) => set("edgeLine", v)}
             />
 
+            <h3>Clarity</h3>
+            <p className="control-note">
+              Four separate looks the material adds on its own. Turn all four
+              off, with Rim and Highlight, and the plasma is a plain lens - the
+              Aqua tab above.
+            </p>
+            <Slider
+              label="Shimmer"
+              min={0}
+              max={2}
+              step={0.1}
+              value={s.shimmer}
+              onChange={(v) => set("shimmer", v)}
+            />
+            <Slider
+              label="Glow"
+              min={0}
+              max={2}
+              step={0.1}
+              value={s.glow}
+              onChange={(v) => set("glow", v)}
+            />
+            <Slider
+              label="Wash"
+              min={0}
+              max={1}
+              step={0.05}
+              value={s.wash}
+              onChange={(v) => set("wash", v)}
+            />
+            <Slider
+              label="Grain"
+              min={0}
+              max={2}
+              step={0.1}
+              value={s.grain}
+              onChange={(v) => set("grain", v)}
+            />
+            <Slider
+              label="Background blur"
+              unit="px"
+              min={0}
+              max={40}
+              step={2}
+              value={s.backgroundBlur}
+              onChange={(v) => set("backgroundBlur", v)}
+            />
+
             <h3>Snapping</h3>
             <Slider
               label="Grid"
@@ -927,6 +1051,36 @@ function Api() {
               ],
               ["edgeLine", "number", "1", "Thin outline. 0 = off."],
               [
+                "shimmer",
+                "number",
+                "1",
+                "The slow iridescent sheen drifting across each surface. 0 = off.",
+              ],
+              [
+                "glow",
+                "number",
+                "1",
+                "The halo of color the plasma casts on the background around it - the soft light that remains at elevation 0. 0 = off.",
+              ],
+              [
+                "wash",
+                "number",
+                "1",
+                "How much of its own cast the material puts on what you see through it. 0 = clear as water.",
+              ],
+              [
+                "grain",
+                "number",
+                "1",
+                "Film grain on the background. 0 = off.",
+              ],
+              [
+                "backgroundBlur",
+                "number",
+                "0",
+                "Blur the background itself, in px (0-40). Unlike frost, which blurs only what a frosted surface sees.",
+              ],
+              [
                 "pointerDrop",
                 "boolean",
                 "true",
@@ -946,11 +1100,24 @@ function Api() {
               ],
               ["quality", "number", "1.25", "Max canvas pixel ratio."],
               [
+                "freezeOnScroll",
+                "boolean",
+                "false",
+                "Touch only: pin the last frame through a fling, resume when scrolling stops.",
+              ],
+              [
                 "maxSurfaces",
                 "number",
                 "16",
-                "Visible surface budget. Fixed at mount; higher costs GPU time.",
+                "Visible surface budget. Changing it rebuilds the shaders; higher costs GPU time.",
               ],
+              [
+                "canvas",
+                "boolean",
+                "true",
+                "false: render <PlasmaCanvas /> yourself to place and style the element.",
+              ],
+              ["zIndex", "number", "-1", "z-index of the canvas."],
             ]}
           />
         </div>
@@ -963,7 +1130,12 @@ function Api() {
           <p>Any element in the material. Accepts all HTML props.</p>
           <PropTable
             rows={[
-              ["as", "ElementType", `"div"`, "Element to render."],
+              [
+                "as",
+                "ElementType",
+                `"div"`,
+                'Element or component to render. Its own props typecheck: as="a" takes href.',
+              ],
               [
                 "radius",
                 "number",
@@ -1013,16 +1185,22 @@ function Api() {
                 "Drag area and grid origin.",
               ],
               [
+                "group",
+                "string",
+                "",
+                "Snap only against surfaces in the same group. Ungrouped surfaces form one group.",
+              ],
+              [
                 "offset · defaultOffset",
                 "{ x, y }",
                 "",
                 "Controlled or initial offset; changes spring into place.",
               ],
               [
-                "onDragEnd",
-                "(offset) => void",
+                "onDragStart · onDragEnd",
+                "() => void · (offset) => void",
                 "",
-                "Reports the settled offset.",
+                "Drag lifecycle; onDragEnd gets the settled offset.",
               ],
               [
                 "onJoinChange",
@@ -1036,13 +1214,36 @@ function Api() {
       </Plasma>
       <Plasma className="api" radius={30} lean={false} padding={16}>
         <div className="plate">
+          <h3>Hooks</h3>
+          <p>
+            <code>usePlasmaRuntime()</code> gives{" "}
+            <code>pulse(x, y, strength)</code>, which sends a wave from a
+            viewport point, <code>bump(energy)</code>, which brightens the
+            material briefly, and <code>supported</code>, false when the CSS
+            fallback is active. Its value is stable, so reading it does not
+            re-render your component on every styling change.
+          </p>
+          <p>
+            <code>usePlasmaDefaults()</code> gives the provider-level{" "}
+            <code>tint</code>, <code>opacity</code>, <code>frost</code>,{" "}
+            <code>radius</code>, <code>grid</code>, <code>magnet</code> and{" "}
+            <code>spring</code>. <code>usePlasma()</code> returns both together.
+          </p>
+        </div>
+      </Plasma>
+      <Plasma className="api" radius={30} lean={false} padding={16}>
+        <div className="plate">
           <h3>
-            <code>usePlasma()</code>
+            <code>&lt;PlasmaCanvas&gt;</code>
           </h3>
           <p>
-            <code>pulse(x, y, strength)</code> sends a wave from a viewport
-            point. <code>bump(energy)</code> brightens the material briefly.{" "}
-            <code>supported</code> is false when the CSS fallback is active.
+            The provider renders the canvas itself. Pass{" "}
+            <code>canvas={"{false}"}</code> and place a{" "}
+            <code>&lt;PlasmaCanvas /&gt;</code> anywhere inside it to choose
+            where the element lives and how it is styled - it takes{" "}
+            <code>className</code>, <code>style</code> and <code>zIndex</code>.
+            The renderer still draws the whole viewport; this places the
+            element, not the field.
           </p>
         </div>
       </Plasma>

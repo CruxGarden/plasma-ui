@@ -82,6 +82,7 @@ section { margin-top: 140px; }
 .hero-install { padding: 22px 48px; width: min(504px, 100%); }
 .hero-install code { white-space: nowrap; }
 .hero-install code { font-size: .95rem; }
+.hero-note { color: var(--muted); font-size: .8rem; max-width: 44ch; margin-top: 1.25rem; opacity: .85; }
 
 /* steps: no gaps, so they render as one surface */
 
@@ -111,6 +112,7 @@ section { margin-top: 140px; }
 .controls h3:first-child { margin-top: 0; }
 .field { margin-top: .7rem; }
 .field label { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); }
+.control-note { font-size: .78rem; line-height: 1.45; color: var(--muted); margin: .45rem 0 1rem; max-width: 34ch; }
 .field label span { color: var(--text); font-variant-numeric: tabular-nums; }
 .field.inline { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .flabel { font-size: .85rem; color: var(--muted); }

@@ -3,3 +3,4 @@ dist/
 site/dist/
 *.tgz
 .DS_Store
+tests/.tmp/

@@ -6,13 +6,14 @@ Liquid panels for React, rendered in WebGL on canvas, inspired by Apple's Liquid
 
 [Playground and Docs](https://cruxgarden.github.io/plasma-ui/) · [Workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/)
 
-**Status: 0.2.0.** Core is stable and tested, but the API may change.
+**Status: 0.3.0.** Core is stable and tested, but the API may change.
 
 ```bash
 npm install @cruxgarden/plasma-ui
 ```
 
-Zero dependencies, except for React.
+Zero dependencies, except for React. Best on desktop: the effect is GPU-heavy
+and does not run well on mobile.
 
 ```tsx
 import { PlasmaProvider, Plasma } from "@cruxgarden/plasma-ui";
@@ -58,12 +59,19 @@ export function App() {
 | `rimWidth`                 | `number`                                 | `1`            | How far the rim reaches in from the edge                                                                                                                                             |
 | `highlight`                | `number`                                 | `1`            | Pointer-facing highlight; `0` turns it off                                                                                                                                           |
 | `edgeLine`                 | `number`                                 | `1`            | Thin line along the outline; `0` turns it off                                                                                                                                        |
+| `shimmer`                  | `number`                                 | `1`            | The slow iridescent sheen that drifts across the body of each surface; `0` turns it off                                                                                              |
+| `glow`                     | `number`                                 | `1`            | The halo of color the plasma casts on the background around it - the soft light that is still there at `elevation={0}`; `0` turns it off                                             |
+| `wash`                     | `number`                                 | `1`            | How much of its own cast the material puts on what you see through it; `0` passes the background straight through                                                                    |
+| `grain`                    | `number`                                 | `1`            | Film grain over the background (never over the surfaces); `0` turns it off                                                                                                           |
+| `backgroundBlur`           | `number`                                 | `0`            | Blur the background itself, in CSS px (0-40). Unlike `frost`, which blurs only what a frosted surface sees, this softens the whole field                                              |
 | `pointerDrop`              | `boolean`                                | `true`         | Liquid drop that follows the pointer                                                                                                                                                 |
 | `ambientDrops`             | `boolean`                                | `false`        | Decorative orbiting drops                                                                                                                                                            |
 | `grid`, `magnet`           | `number`                                 | `24`, `40`     | Snap grid size and edge latch distance                                                                                                                                               |
 | `quality`                  | `number`                                 | `1.25`         | Maximum canvas pixel ratio                                                                                                                                                           |
-| `maxSurfaces`              | `number`                                 | `16`           | Visible surface budget, compiled into the shaders (fixed at mount); higher costs GPU time                                                                                            |
+| `freezeOnScroll`           | `boolean`                                | `false`        | Touch devices only: pin the last drawn frame to the page through a fling and resume when the scrolling stops                                                                          |
+| `maxSurfaces`              | `number`                                 | `16`           | Visible surface budget, compiled into the shaders; changing it rebuilds them, and higher costs GPU time                                                                              |
 | `zIndex`                   | `number`                                 | `-1`           | Canvas stacking order                                                                                                                                                                |
+| `canvas`                   | `boolean`                                | `true`         | `false`: render [`<PlasmaCanvas />`](#plasmacanvas) yourself to choose where the element sits and how it is styled                                                                    |
 
 ## `<Plasma>`
 
@@ -71,7 +79,7 @@ Accepts all HTML attributes, plus the following:
 
 | Prop                                    | Type                     | Default  | Description                                                                                                         |
 | --------------------------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `as`                                    | `ElementType`            | `"div"`  | Element to render                                                                                                   |
+| `as`                                    | `ElementType`            | `"div"`  | Element or component to render. Its props typecheck through: `as="a"` takes `href`, `as={Link}` takes `to`           |
 | `radius`                                | `number`                 | provider | Corner radius (px) for this surface                                                                                 |
 | `lean`                                  | `number \| false`        | `10`     | Lean toward the pointer while standalone                                                                            |
 | `tint`, `opacity`, `frost`, `elevation` | `string`, `number`       | provider | Color, translucency, and shadow depth for this surface; joined surfaces with different values blend into each other |
@@ -80,15 +88,74 @@ Accepts all HTML attributes, plus the following:
 | `draggable`                             | `boolean`                | `false`  | Move freely, snap on release; arrow keys move one grid step                                                         |
 | `snap`                                  | `boolean`                | `true`   | Latch to neighbor edges, otherwise the grid                                                                         |
 | `bounds`                                | `RefObject<HTMLElement>` | viewport | Drag area and grid origin                                                                                           |
+| `group`                                 | `string`                 |          | Snap only against surfaces in the same group; surfaces with no group form one group of their own                    |
 | `offset` / `defaultOffset`              | `{ x, y }`               |          | Controlled or initial offset; changes spring into place                                                             |
 | `onDragStart`, `onDragEnd(offset)`      |                          |          | Drag lifecycle; `onDragEnd` gets the settled offset                                                                 |
 | `onJoinChange(joined)`                  |                          |          | Fires when the surface fuses with or separates from a neighbor                                                      |
 
+Everything else you pass goes to the rendered element. `PlasmaProps<C>` is the
+full prop type for `<Plasma as={C}>`; `PlasmaOwnProps` is just the table above,
+if you need to wrap `Plasma` in a component of your own.
+
 Drag ignores presses on buttons, links, inputs, and anything marked `data-plasma-nodrag`.
 
-## `usePlasma()`
+## Hooks
 
-Returns `pulse(x, y, strength?)`, `bump(energy)`, `supported`, `grid`, `magnet`, `spring`, and `reducedMotion`.
+| Hook                  | Returns                                                                       |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `usePlasmaRuntime()`  | `renderer`, `supported`, `reducedMotion`, `pulse(x, y, strength?)`, `bump(energy)` |
+| `usePlasmaDefaults()` | `tint`, `opacity`, `frost`, `radius`, `grid`, `magnet`, `spring`               |
+| `usePlasma()`         | both of the above, in one object                                              |
+
+`usePlasmaRuntime()` is the one to reach for when you only need `pulse`: its
+value is stable, so a component reading it is not re-rendered every time a
+styling prop on the provider changes. `usePlasma()` is the convenient one and
+re-renders on any change.
+
+## `<PlasmaCanvas>`
+
+The provider renders the canvas itself unless you pass `canvas={false}`, in
+which case render `<PlasmaCanvas />` wherever you want the element to live:
+
+```tsx
+<PlasmaProvider canvas={false}>
+  <div className="page-backdrop" />
+  <PlasmaCanvas zIndex={0} className="field" />
+  <main>...</main>
+</PlasmaProvider>
+```
+
+It takes `className`, `style` and `zIndex`. Note that this places and styles
+the **element**; the renderer still draws the whole viewport. Confining the
+field to a container is [roadmap](#roadmap) work, not something this prop does.
+
+## Clear as water
+
+Six things give the material a look of its own, and each is a separate
+control, so "plain glass, nothing but the lens" is a configuration rather than
+a fork:
+
+```tsx
+<PlasmaProvider
+  rim={0} // the iridescent edge
+  highlight={0} // the specular that follows the pointer
+  shimmer={0} // the sheen drifting across the body
+  glow={0} // the halo cast on the background - visible even at elevation 0
+  wash={0} // the material's own tint on what you see through it
+  grain={0} // film grain on the background
+  edgeLine={0.35} // a hairline is usually still wanted: it is what reads as an edge
+  refraction={1.5}
+  dispersion={1.6}
+/>
+```
+
+The **Aqua** tab in the [playground](https://cruxgarden.github.io/plasma-ui/)
+is exactly this, with all six sliders live next to it.
+
+Two of these answer questions that come up often: the faint rainbow that never
+went away no matter how far `rim` came down is `shimmer`, and the soft light
+still hugging a panel at `elevation={0}` is `glow` - it is cast by the plasma,
+not by the shadow, which really is off at `0`.
 
 ## Custom moods
 
@@ -133,7 +200,7 @@ NOTE: `flow` ripples the outline, so leave it at `0` whenever flush edges should
 
 - Use Plasma for container components: panels, docks, cards, dialogs. Components should be nested inside.
 - Place surfaces together or further apart than the Blend distance. Smaller gaps render as liquid bridging them.
-- Up to `maxSurfaces` (default 16) draw at once; offscreen panels are skipped first. Two render passes loop over every slot per pixel, so set this value only as high as you need.
+- Up to `maxSurfaces` (default 16) draw at once; offscreen panels are skipped first, and the library warns in the console when it has to drop any. Two render passes loop over every slot per pixel, so set this value only as high as you need. Changing it recompiles the shaders, so change it when the layout changes, not per frame.
 - Lean and Pulse use the CSS `translate` and `scale` properties, and Drag uses `transform`. Avoid setting these properties on `Plasma` elements yourself.
 - `prefers-reduced-motion` disables Lean, Pulse, the pointer Drop, and Spring.
 
@@ -152,6 +219,14 @@ Contributions welcome for any of these - see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Browser support
 
 Chrome, Edge, Firefox, and Safari 16.4+ (WebGL2). In non-supported browsers, `Plasma` renders as a CSS frosted panel and all layout, drag, and snap behavior still works.
+
+**Use it on the desktop.** Every pass is full-viewport, so the cost scales with
+the canvas, and phones pay it at a device pixel ratio the effect does not need.
+It runs on mobile - resolution drops past a pixel budget, and `freezeOnScroll`
+pins the last frame through a fling - but it is not where this belongs.
+
+Server rendering works: surfaces come out as the CSS fallback with no layout
+effect warnings, and the canvas takes over on hydration.
 
 ## Development
 

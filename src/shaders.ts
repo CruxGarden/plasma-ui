@@ -195,7 +195,7 @@ void main(){
 const compFrag = `#version 300 es
 ${common}
 uniform sampler2D uH, uS, uTint, uBg, uBgM, uBgH, uFrost;
-uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair;
+uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair, uShim, uGlow, uWash, uGrain;
 uniform vec3 uRimColor;
 out vec4 o;
 
@@ -252,7 +252,7 @@ void main(){
   // Palette phases run on viewport position, like the grain: a frame drawn for
   // a taller region must colour its viewport band exactly as the live frame does.
   vec2 vp = p - uView.xy;
-  col += pal(uTime*.03 + vp.x/1400.) * .06 * smoothstep(.0, .45, hHere) * (1.+uEnergy);
+  col += pal(uTime*.03 + vp.x/1400.) * .06 * smoothstep(.0, .45, hHere) * (1.+uEnergy) * uGlow;
 
   if(sd > -2.){
     vec2 th = 2. / vec2(textureSize(uH, 0));
@@ -272,7 +272,12 @@ void main(){
       seen(p + off, fr).g,
       seen(p + off*(1.-disp), fr).b
     );
+    // uWash 0 hands the background through untouched - glass with no cast of
+    // its own. 1 is the original desaturate-and-lift that gives the material
+    // its body.
+    vec3 clearRefr = refr;
     refr = mix(refr, vec3(dot(refr, vec3(.333))), .18) * mix(1.08, .9, uLight) + .03*(1.-uLight);
+    refr = mix(clearRefr, refr, uWash);
     // frosted: milkier and a little brighter
     refr = mix(refr, mix(refr, vec3(dot(refr, vec3(.333))), .25) * mix(1.12, .97, uLight) + mix(.05, .03, uLight), fr);
     float hl = 1. - .55*uLight;
@@ -297,7 +302,7 @@ void main(){
     plasma += rimCol * fres * .45 * hl * uRim;
     plasma += vec3(1.) * spec * .75 * hl * uSpec;
     // faint shimmer across the body; fades out as the tint becomes opaque
-    plasma += pal(uTime*.04 + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha);
+    plasma += pal(uTime*.04 + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha) * uShim;
     vec3 hairCol = uRimMode > .5 ? mix(vec3(1.), rimCol / 1.4, .6) : vec3(.9,.95,1.);
     plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
 
@@ -307,7 +312,7 @@ void main(){
   }
   // Keyed on viewport position, so a frame drawn for a taller region has the
   // same grain in its viewport band as the live frame that replaces it.
-  col += (hash(p - uView.xy + uTime) - .5) * .025 * grain;
+  col += (hash(p - uView.xy + uTime) - .5) * .025 * grain * uGrain;
   o = vec4(col, 1.);
 }`;
 

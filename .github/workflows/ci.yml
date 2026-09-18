@@ -23,3 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run verify # tsc + node:test + esbuild — the same gate the agent runs
       - run: npm run build:pages # the site and every example still build
+      # Peer range is react >=18 but devDependencies pin the 18 types, so the
+      # 19 shapes (RefObject<T | null>, the new ref-as-prop) are only ever
+      # exercised here. Last, because it swaps what is in node_modules.
+      - run: npm run typecheck:react19
