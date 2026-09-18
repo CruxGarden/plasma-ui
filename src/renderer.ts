@@ -171,23 +171,25 @@ function parseCssColor(src: string): [number, number, number] | null {
 export class PlasmaRenderer {
   private gl: WebGL2RenderingContext;
   private canvas: HTMLCanvasElement;
-  private progs: { bg: Prog; mask: Prog; tint: Prog; blur: Prog; comp: Prog };
-  private rtA: Target; private rtB: Target; private rtC: Target; private rtT: Target;
-  private rtFr: Target; private rtBg: Target; private rtBgM: Target; private rtBgH: Target;
-  private mrtFb: WebGLFramebuffer;
+  private progs!: { bg: Prog; mask: Prog; tint: Prog; blur: Prog; comp: Prog };
+  private rtA!: Target; private rtB!: Target; private rtC!: Target; private rtT!: Target;
+  private rtFr!: Target; private rtBg!: Target; private rtBgM!: Target; private rtBgH!: Target;
+  private mrtFb!: WebGLFramebuffer;
   private imgTex: WebGLTexture | null = null;
   private imgRes: [number, number] = [1, 1];
   private imgSrc: BackgroundSource | null = null;
   private bgColor: [number, number, number] | null = null;
   private srcEl: HTMLCanvasElement | HTMLVideoElement | null = null; // re-uploaded each frame
-  private floatOK: boolean;
+  private floatOK = false;
+  /** True between webglcontextlost and webglcontextrestored: draw nothing. */
+  private lost = false;
+  private resizeSettle: ReturnType<typeof setTimeout> | undefined;
   private recs = new Map<number, Rec>();
   private nextId = 1;
   private raf = 0;
   private last = 0;
   private time = 0;
   private dpr = 1;
-  private resizeQueued = false;
   /** Coarse pointer = touch. Only there does a fling run on the compositor with rAF deferred. */
   private coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   private frozen = false;
@@ -240,20 +242,11 @@ export class PlasmaRenderer {
     this.FR = new Float32Array(this.max);
     this.EL = new Float32Array(this.max);
     this.SOLO = new Float32Array(this.max);
-    this.floatOK = !!gl.getExtension("EXT_color_buffer_float");
-    const sh = makeShaders(this.max);
-    this.progs = { bg: this.program(sh.bgFrag), mask: this.program(sh.maskFrag), tint: this.program(sh.tintFrag), blur: this.program(sh.blurFrag), comp: this.program(sh.compFrag) };
-    const buf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    this.rtA = this.target(); this.rtB = this.target(); this.rtC = this.target(); this.rtT = this.target();
-    this.rtFr = this.target(); this.rtBg = this.target(); this.rtBgM = this.target(); this.rtBgH = this.target();
-    this.mrtFb = gl.createFramebuffer()!;
-    this.configure(settings, true);
+    this.initGL();
     this.mouse.x = this.mouse.tx = innerWidth / 2;
     this.mouse.y = this.mouse.ty = innerHeight / 2;
+    canvas.addEventListener("webglcontextlost", this.onContextLost);
+    canvas.addEventListener("webglcontextrestored", this.onContextRestored);
     addEventListener("resize", this.resize);
     document.addEventListener("visibilitychange", this.onVisibility);
     // The setting is read per event, so it can be toggled through configure().
@@ -389,8 +382,55 @@ export class PlasmaRenderer {
   /** Raise the material's energy (brightens contours and color); it decays on its own. */
   bump(e: number) { this.energy = Math.max(this.energy, Math.min(e, 1)); }
 
+  /**
+   * Every GL object this renderer owns. A lost context invalidates all of
+   * them, so creation lives here rather than in the constructor: the restore
+   * handler runs exactly the same path.
+   */
+  private initGL() {
+    const gl = this.gl;
+    this.floatOK = !!gl.getExtension("EXT_color_buffer_float");
+    const sh = makeShaders(this.max);
+    this.progs = { bg: this.program(sh.bgFrag), mask: this.program(sh.maskFrag), tint: this.program(sh.tintFrag), blur: this.program(sh.blurFrag), comp: this.program(sh.compFrag) };
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    this.rtA = this.target(); this.rtB = this.target(); this.rtC = this.target(); this.rtT = this.target();
+    this.rtFr = this.target(); this.rtBg = this.target(); this.rtBgM = this.target(); this.rtBgH = this.target();
+    this.mrtFb = gl.createFramebuffer()!;
+    this.configure(this.settings, true);
+  }
+
+  /**
+   * A drag-resize reallocates eight render targets per distinct size, and the
+   * driver can drop the context under that. Without these two handlers the
+   * field simply stopped: the frame loop kept running against a dead context
+   * and nothing ever brought it back. preventDefault is what asks the browser
+   * to attempt a restore at all.
+   */
+  private onContextLost = (e: Event) => {
+    e.preventDefault();
+    this.lost = true;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+  };
+
+  private onContextRestored = () => {
+    this.lost = false;
+    this.initGL();
+    this.canvas.width = this.canvas.height = 0; // force allocate() past its unchanged-size check
+    this.applyResize();
+    this.last = 0;
+    if (!document.hidden && !this.raf) this.raf = requestAnimationFrame(this.frame);
+  };
+
   destroy() {
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.resizeSettle);
+    this.canvas.removeEventListener("webglcontextlost", this.onContextLost);
+    this.canvas.removeEventListener("webglcontextrestored", this.onContextRestored);
     removeEventListener("resize", this.resize);
     document.removeEventListener("visibilitychange", this.onVisibility);
     removeEventListener("scroll", this.onScroll);
@@ -473,12 +513,12 @@ export class PlasmaRenderer {
    * otherwise reallocated every texture repeatedly mid-scroll.
    */
   private resize = () => {
-    if (this.resizeQueued) return;
-    this.resizeQueued = true;
-    requestAnimationFrame(() => {
-      this.resizeQueued = false;
-      this.applyResize();
-    });
+    // Coalescing per frame still reallocated once per distinct size, which is
+    // dozens of times through a window drag — enough to lose the context. Wait
+    // for the drag to settle instead. The canvas is sized in CSS, so it
+    // stretches meanwhile and sharpens when the reallocation lands.
+    clearTimeout(this.resizeSettle);
+    this.resizeSettle = setTimeout(this.applyResize, 120);
   };
 
   private applyResize = () => {
@@ -534,6 +574,7 @@ export class PlasmaRenderer {
   }
 
   private frame = (now: number) => {
+    if (this.lost) { this.raf = 0; return; }
     if (!this.oneShot) this.raf = requestAnimationFrame(this.frame);
     const dt = this.last ? Math.min((now - this.last) / 1000, 0.05) : 0.016;
     this.last = now;

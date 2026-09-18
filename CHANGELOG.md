@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.4
+
+- **Fixed:** the field stopped rendering after a window resize and never came
+  back. Two causes, both now addressed. A drag-resize reallocated the eight
+  render targets once per distinct size — 88 allocations across a 60-step drag
+  in the repro — and the driver dropped the WebGL context under it. And there
+  was no `webglcontextlost` / `webglcontextrestored` handling at all, so once
+  the context went, the frame loop kept running against a dead context
+  forever. The resize now settles before reallocating (88 allocations became
+  8, and the context survives), and a lost context is caught, restored and
+  fully rebuilt. `preventDefault` on the loss event is what asks the browser
+  to attempt the restore in the first place.
+
 ## 0.2.1
 
 Fixes for the reports that came in after 0.2.0, and one new option.
