@@ -12,6 +12,15 @@
   8, and the context survives), and a lost context is caught, restored and
   fully rebuilt. `preventDefault` on the loss event is what asks the browser
   to attempt the restore in the first place.
+- **Fixed:** the field never rendered at all under React StrictMode. `destroy()`
+  called `WEBGL_lose_context.loseContext()`, but the `<canvas>` belongs to the
+  host component and outlives the renderer, so the remount StrictMode performs
+  in development got a context that could never draw again. Cleanup now
+  deletes its own textures, framebuffers, programs and buffer and leaves the
+  canvas usable. A renderer replacing another on the same canvas also zeroes
+  the canvas size, so the next allocation is never skipped as a no-op — that
+  skip left the multi-target framebuffer with no attachments and drew
+  "Framebuffer is incomplete".
 
 ## 0.2.1
 

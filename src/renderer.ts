@@ -184,6 +184,8 @@ export class PlasmaRenderer {
   /** True between webglcontextlost and webglcontextrestored: draw nothing. */
   private lost = false;
   private resizeSettle: ReturnType<typeof setTimeout> | undefined;
+  /** Everything initGL() created, so destroy() can free it by hand. */
+  private owned: { tex: WebGLTexture[]; fb: WebGLFramebuffer[]; prog: WebGLProgram[]; buf: WebGLBuffer[] } = { tex: [], fb: [], prog: [], buf: [] };
   private recs = new Map<number, Rec>();
   private nextId = 1;
   private raf = 0;
@@ -389,10 +391,12 @@ export class PlasmaRenderer {
    */
   private initGL() {
     const gl = this.gl;
+    this.owned = { tex: [], fb: [], prog: [], buf: [] };
     this.floatOK = !!gl.getExtension("EXT_color_buffer_float");
     const sh = makeShaders(this.max);
     this.progs = { bg: this.program(sh.bgFrag), mask: this.program(sh.maskFrag), tint: this.program(sh.tintFrag), blur: this.program(sh.blurFrag), comp: this.program(sh.compFrag) };
     const buf = gl.createBuffer();
+    if (buf) this.owned.buf.push(buf);
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
@@ -400,7 +404,15 @@ export class PlasmaRenderer {
     this.rtA = this.target(); this.rtB = this.target(); this.rtC = this.target(); this.rtT = this.target();
     this.rtFr = this.target(); this.rtBg = this.target(); this.rtBgM = this.target(); this.rtBgH = this.target();
     this.mrtFb = gl.createFramebuffer()!;
+    this.owned.fb.push(this.mrtFb);
     this.configure(this.settings, true);
+    // These objects have no storage or attachments yet, and allocate() skips
+    // its work when the pixel size is unchanged — which it is whenever this
+    // renderer replaced another on the same canvas (every StrictMode remount
+    // in development, and every context restore). Zero the size so the next
+    // applyResize() always reallocates; otherwise mrtFb is drawn into with no
+    // attachment: "Framebuffer is incomplete: No attachments".
+    this.canvas.width = this.canvas.height = 0;
   }
 
   /**
@@ -420,7 +432,6 @@ export class PlasmaRenderer {
   private onContextRestored = () => {
     this.lost = false;
     this.initGL();
-    this.canvas.width = this.canvas.height = 0; // force allocate() past its unchanged-size check
     this.applyResize();
     this.last = 0;
     if (!document.hidden && !this.raf) this.raf = requestAnimationFrame(this.frame);
@@ -439,7 +450,18 @@ export class PlasmaRenderer {
     document.removeEventListener("pointerleave", this.onLeave);
     this.recs.forEach(r => { r.el.style.translate = ""; r.el.style.scale = ""; });
     this.recs.clear();
-    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
+    // Free the GPU objects, but leave the canvas usable. loseContext() is a
+    // testing sledgehammer: the <canvas> belongs to React and outlives this
+    // renderer, so poisoning its context meant a remount — every StrictMode
+    // mount in development — got a context that could never draw again.
+    const gl = this.gl;
+    if (!gl.isContextLost()) {
+      this.owned.tex.forEach(t => gl.deleteTexture(t));
+      this.owned.fb.forEach(f => gl.deleteFramebuffer(f));
+      this.owned.prog.forEach(pr => gl.deleteProgram(pr));
+      this.owned.buf.forEach(b => gl.deleteBuffer(b));
+    }
+    this.owned = { tex: [], fb: [], prog: [], buf: [] };
   }
 
   /**
@@ -897,6 +919,7 @@ export class PlasmaRenderer {
     if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr) || "program link failed");
     const u: Prog["u"] = {};
     UNIFORMS.forEach(n => { u[n] = gl.getUniformLocation(pr, n); });
+    this.owned.prog.push(pr);
     return { pr, u };
   }
 
@@ -908,6 +931,8 @@ export class PlasmaRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    return { tex, fb: gl.createFramebuffer()!, w: 0, h: 0 };
+    const fb = gl.createFramebuffer()!;
+    this.owned.tex.push(tex); this.owned.fb.push(fb);
+    return { tex, fb, w: 0, h: 0 };
   }
 }
