@@ -1075,6 +1075,24 @@ function Api() {
                 "Film grain on the background. 0 = off.",
               ],
               [
+                "material",
+                `"plasma" | "crystal" | "metal" | "wood" | "stone" | "cloud"`,
+                `"plasma"`,
+                "What the surfaces are made of. One engine; only the composite pass differs.",
+              ],
+              [
+                "lightDir",
+                "[x, y, z]",
+                "up-left",
+                "Where the one light comes from. Every opaque material reads it, so they agree.",
+              ],
+              [
+                "roughness · anisotropy",
+                "number",
+                "0.28 · 0",
+                "Metal's finish, and how far a highlight stretches along the grain.",
+              ],
+              [
                 "backgroundBlur",
                 "number",
                 "0",
