@@ -111,4 +111,12 @@ export const PAGES = [
       "A working workspace built on Plasma UI: inbox, reader, tasks and player as draggable panels that fuse when they touch.",
     path: "examples/workspace/index.html",
   },
+  {
+    entry: "examples/materials/main.tsx",
+    css: "examples/materials/style.css",
+    title: "Plasma UI — Materials",
+    description:
+      "One engine, six materials: plasma, crystal, metal, wood, stone and cloud. The geometry, springs and fusing are shared; only the composite pass differs.",
+    path: "examples/materials/index.html",
+  },
 ];

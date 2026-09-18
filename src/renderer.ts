@@ -34,6 +34,14 @@ export interface RendererSettings {
   grain: number;
   /** Blur applied to the background only, in CSS px (0-40). Costs 8 extra blur passes when above 0. */
   backgroundBlur: number;
+  /** What the surfaces are made of. */
+  material: MaterialName;
+  /** Direction the one light comes from. Every opaque material reads it, so they agree. */
+  lightDir: [number, number, number];
+  /** Surface finish: 0 mirror, 1 chalk. Used by metal; the others carry their own. */
+  roughness: number;
+  /** How far the highlight stretches along the grain. 0 is isotropic. */
+  anisotropy: number;
   /** 0 = watery and bouncy, 1 = thick and slow. */
   viscosity: number;
   /** How far the surface trails behind moving panels. 0 = no trailing. */
@@ -53,6 +61,14 @@ export interface RendererSettings {
   /** Background: CSS color, image URL, or a live img/canvas/video source (null for the procedural mood field). */
   background: BackgroundSource | null;
 }
+
+/**
+ * The materials a surface can be made of. `plasma` is the original and the
+ * default; the rest share its geometry, its springs and its fusing, and differ
+ * only in the composite pass — which is the whole reason they are cheap.
+ */
+export const MATERIALS = ["plasma", "crystal", "metal", "wood", "stone", "cloud"] as const;
+export type MaterialName = (typeof MATERIALS)[number];
 
 /** Anything the background can be: a CSS color string, an image URL, or an element to sample (canvas and video update live). */
 export type BackgroundSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | ImageBitmap;
@@ -117,7 +133,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -918,7 +934,13 @@ export class PlasmaRenderer {
       if (this.T[i * 4 + 3] > 0.002) hasTint = true;
       if (this.EL[i] > 0.002) hasElev = true;
     }
-    if (hasFrost) {
+    // A reflective material reads the same blurred copies frost does — that is
+    // the whole trick behind roughness costing nothing — so the chain has to
+    // run for it too. Without this, metal at frost 0 sampled whatever those
+    // targets happened to hold, which drew ghosts of the previous pass inside
+    // every panel.
+    const reflective = s.material === "metal" || s.material === "crystal";
+    if (hasFrost || reflective) {
       // Ping-pong arranged so the sixth pass lands in rtBgM; this used to end
       // in the scratch target and spend a seventh pass copying it across.
       pass(this.rtBg, this.rtB, 1.5 * k, 0); pass(this.rtB, this.rtBgM, 0, 2.5 * k);
@@ -976,6 +998,10 @@ export class PlasmaRenderer {
     gl.uniform1f(c.u.uGlow, s.glow);
     gl.uniform1f(c.u.uWash, s.wash);
     gl.uniform1f(c.u.uGrain, s.grain);
+    gl.uniform1f(c.u.uMat, Math.max(0, MATERIALS.indexOf(s.material)));
+    gl.uniform3f(c.u.uLightDir, s.lightDir[0], s.lightDir[1], s.lightDir[2]);
+    gl.uniform1f(c.u.uRough, s.roughness);
+    gl.uniform1f(c.u.uAniso, s.anisotropy);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.rtC.tex);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.rtA.tex);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.rtT.tex);

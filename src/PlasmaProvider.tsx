@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { BackgroundSource, PlasmaRenderer, RendererSettings } from "./renderer";
+import { BackgroundSource, MaterialName, PlasmaRenderer, RendererSettings } from "./renderer";
 import { Mood, MoodName, resolveMood } from "./moods";
 
 export interface PlasmaProviderProps {
@@ -41,6 +41,22 @@ export interface PlasmaProviderProps {
   wash?: number;
   /** Film grain over the background (never over the surfaces). 0 turns it off. Default 1. */
   grain?: number;
+  /**
+   * What the surfaces are made of: "plasma" (the default), "crystal",
+   * "metal", "wood", "stone" or "cloud". Every material shares the same
+   * geometry, springs and fusing and differs only in how it is shaded.
+   */
+  material?: MaterialName;
+  /**
+   * Where the one light comes from, as a direction. Every opaque material
+   * reads it, so two of them on a page agree about the sun. Default is up and
+   * to the left, in front.
+   */
+  lightDir?: [number, number, number];
+  /** Surface finish for metal: 0 is a mirror, 1 is chalk. Default 0.28. */
+  roughness?: number;
+  /** How far a highlight stretches along the grain. 0 is isotropic. Default 0. */
+  anisotropy?: number;
   /** Blur the background itself, in CSS px, 0-40. Softens the whole field, unlike `frost`, which blurs only what a frosted surface sees. Default 0. */
   backgroundBlur?: number;
   /** How thick the material feels: 0 is watery and bouncy, 1 is slow like syrup. Also scales drag and snap springs. Default 0.5. */
@@ -228,6 +244,7 @@ export function PlasmaProvider({
   children, mood = "tidal", theme = "auto", blend, refraction = 1, dispersion = 1, rim = 1, smoothness = 1,
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
   shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0,
+  material = "plasma", lightDir = [-0.42, -0.62, 0.66], roughness = 0.28, anisotropy = 0,
   pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
   freezeOnScroll = false, canvas = true,
 }: PlasmaProviderProps) {
@@ -245,6 +262,7 @@ export function PlasmaProvider({
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
     pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
     rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur,
+    material, lightDir, roughness, anisotropy,
     viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };
   const settingsRef = useLatest(settings);

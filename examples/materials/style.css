@@ -1,0 +1,31 @@
+:root { --text: #eef4f6; --muted: rgb(238 244 246 / .62); --faint: rgb(238 244 246 / .14); --plate: rgb(6 16 22 / .58); --on: rgb(238 244 246 / .92); --on-text: #06121a; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; overflow: hidden; color: var(--text); background: #04111c; font: 400 15px/1.55 Onest, system-ui, sans-serif; }
+h2 { font: 600 1.5rem "Cormorant Garamond", Georgia, serif; margin: 0 0 6px; text-transform: capitalize; }
+h3 { font: 600 1rem Onest, system-ui, sans-serif; margin: 0 0 6px; }
+p { margin: 0 0 .6rem; }
+:focus-visible { outline: 2px solid #9ff3e4; outline-offset: 3px; }
+
+.page { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 16px; padding: 18px; }
+.bar { flex: none; display: flex; align-items: center; gap: 16px; }
+.wordmark { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 1.3rem; }
+.seg { display: flex; gap: 3px; padding: 3px; border-radius: 999px; background: rgb(0 0 0 / .26); margin-right: auto; }
+.seg button { font: 500 .82rem Onest; color: var(--text); background: none; border: 0; cursor: pointer; padding: .35rem .8rem; border-radius: 999px; text-transform: capitalize; }
+.seg button[aria-pressed="true"] { background: var(--on); color: var(--on-text); }
+.ghost { font: 500 .82rem Onest; color: var(--text); background: none; border: 1px solid var(--faint); border-radius: 999px; padding: .35rem .8rem; cursor: pointer; }
+
+.body { flex: 1; display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 16px; min-height: 0; }
+.col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.card { min-height: 0; }
+.tall { flex: 1; }
+.plate { background: var(--plate); border-radius: 16px; padding: 18px; height: 100%; overflow: auto; }
+.plate.thin { background: none; padding: 18px; }
+.blurb { color: var(--text); }
+.technique { color: var(--muted); font-size: .88rem; }
+
+.controls { display: flex; gap: 22px; }
+.controls label { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.controls label span { color: var(--text); font-variant-numeric: tabular-nums; min-width: 3.2em; }
+.controls label.off { opacity: .32; }
+.controls input { width: 120px; accent-color: var(--text); }

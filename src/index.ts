@@ -19,3 +19,7 @@ export { PlasmaRenderer } from "./renderer";
 export { makeShaders, DEFAULT_MAX_SHAPES } from "./shaders";
 /** @internal */
 export type { BackgroundSource, JoinedSides, RendererSettings, ShapeHandle, ShapeOptions } from "./renderer";
+
+/** The materials a surface can be made of. */
+export { MATERIALS } from "./renderer";
+export type { MaterialName } from "./renderer";
