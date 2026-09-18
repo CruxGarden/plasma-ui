@@ -12,7 +12,7 @@ export interface ShaderSet { maskFrag: string; tintFrag: string; blurFrag: strin
 export function makeShaders(MAX_SHAPES: number): ShaderSet {
 const common = `
 precision highp float;
-uniform vec2 uRes; uniform vec4 uView; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uAmbient, uScroll, uVisc, uFlow;
+uniform vec2 uRes; uniform vec4 uView; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uAmbient, uScroll, uVisc, uFlow, uTension, uThick;
 uniform vec2 uMouse;
 uniform vec4 uP[${MAX_SHAPES}]; uniform vec4 uR[${MAX_SHAPES}]; uniform float uF[${MAX_SHAPES}]; uniform vec4 uT[${MAX_SHAPES}]; uniform float uFr[${MAX_SHAPES}]; uniform float uEl[${MAX_SHAPES}]; uniform float uSolo[${MAX_SHAPES}];
 uniform int uCount;
@@ -51,7 +51,10 @@ float scene(vec2 p){
     if(f < .005) continue;
     vec2 c = uP[i].xy; vec2 h = uP[i].zw * f;
     float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
-    vec4 bx = sdBoxG(p-c, h, min(uR[i], vec4(min(h.x, h.y))), rmax);
+    // Surface tension rounds the footprint here exactly as it does in map3,
+    // or the silhouette clips the solid and bites notches out of a bead.
+    vec4 rcT = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), uTension);
+    vec4 bx = sdBoxG(p-c, h, rcT, rmax);
     if(uSolo[i] > .5){ ds = min(ds, bx.x); continue; }
     if(d > 1e3){ d = bx.x; g = bx.yz; sh = bx.w; continue; }
     // Blend only where surfaces face different ways (corners, gaps, steps);
@@ -110,7 +113,8 @@ void main(){
     if(uF[i] < .005) continue;
     vec2 h = uP[i].zw * uF[i];
     float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
-    float d = sdBoxG(p - uP[i].xy, h, min(uR[i], vec4(min(h.x, h.y))), rmax).x;
+    vec4 rcT2 = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), uTension);
+    float d = sdBoxG(p - uP[i].xy, h, rcT2, rmax).x;
     float w = exp(-max(d, 0.) / 18.) * (1. + smoothstep(0., -24., d) * 4.);
     acc += uT[i] * w; fr += uFr[i] * w; el += uEl[i] * w; wsum += w;
   }
@@ -206,6 +210,10 @@ uniform vec3 uLightDir;
 // chalk. Anisotropy stretches the highlight along the grain — brushed metal
 // and varnished wood both need it, and neither reads right without it.
 uniform float uRough, uAniso;
+// How thick a panel is, in CSS px, and how much the material rounds itself
+// against that. Mercury has enormous surface tension, so a bead pulls toward
+// a sphere; tension drives both the corner radius and how eagerly two beads
+// merge into one body.
 // The edge treatment. A rounded rectangle is right for a liquid, and wrong for
 // almost everything else: stone chips, cloud billows, metal is cut. These
 // displace the silhouette itself — amplitude in CSS px, scale in cycles —
@@ -282,6 +290,47 @@ vec3 envmap(vec3 R, float rough){
   // the horizon band is what gives a curved metal edge its sweep
   c += vec3(.75, .82, .95) * (1. - smoothstep(.0, .22, abs(h - .54))) * .45 * (1. - rough * .55);
   return c;
+}
+
+// ── The scene as a solid ──────────────────────────────────────────────────
+// Everything above shades a flat card: a 2D silhouette, a perturbed normal,
+// a texture lookup. That is skinning, and it is why wood came out looking
+// like a wood-effect laminate. A material reads as a material when there is a
+// body to light — so the same shapes are extruded into a slab and the view ray
+// is marched through it, the way a game would.
+//
+// The 2D mask is a free conservative bound: outside it there is nothing to
+// hit, so the march never starts.
+float map3(vec3 q, float tension, float thick){
+  float d = 1e5;
+  for (int i = 0; i < uCount; i++) {
+    float f = uF[i];
+    if (f < .005) continue;
+    vec2 c = uP[i].xy;
+    vec2 h = uP[i].zw * f;
+    float rmax = max(max(uR[i].x, uR[i].y), max(uR[i].z, uR[i].w));
+    // Surface tension rounds the footprint: at full tension the corner radius
+    // reaches half the short side, so a small panel is a disc and a long one
+    // a stadium. That is the shape a bead wants, fighting the rectangle.
+    vec4 rc = mix(min(uR[i], vec4(min(h.x, h.y))), vec4(min(h.x, h.y)), tension);
+    float d2 = sdBoxG(q.xy - c, h, rc, rmax).x;
+    // Extrude, with the rim rolled over so the slab has a shoulder rather
+    // than a cut edge — a poured bead has no sharp corner anywhere.
+    float roll = thick * (.45 + .55 * tension);
+    vec2 w = vec2(d2 + roll, abs(q.z) - (thick - roll));
+    float de = min(max(w.x, w.y), 0.) + length(max(w, 0.)) - roll;
+    d = (i == 0) ? de : smin(d, de, uGoo * (.6 + 1.8 * tension));
+  }
+  return d;
+}
+
+vec3 normal3(vec3 q, float tension, float thick){
+  vec2 e = vec2(.75, 0.);
+  return normalize(vec3(
+    map3(q + e.xyy, tension, thick) - map3(q - e.xyy, tension, thick),
+    map3(q + e.yxy, tension, thick) - map3(q - e.yxy, tension, thick),
+    map3(q + e.yyx, tension, thick) - map3(q - e.yyx, tension, thick)
+  ));
 }
 
 // Worley/Voronoi: nearest cell, second nearest, and the cell's id. The gap
@@ -482,53 +531,84 @@ void main(){
       cr += toLinear(rimCol) * pow(1. - ndv, 5.) * .5 * uRim;
       plasma = toSrgb(tonemap(cr));
     } else if (uMat < 3.5) {
-      // ── metal, and mercury ─────────────────────────────────────────────────────────
-      // No diffuse term at all — a conductor has none; its colour lives in F0.
-      // The reflection is prefiltered by roughness, and seen() already is a
-      // three-level blurred copy of the background, so the frost chain doubles
-      // as an environment mip. That reuse is why metal costs almost nothing.
-      // Mercury is the same conductor with the surface tension left in: a
-      // mirror finish, a bevel that rolls all the way across the face instead
-      // of stopping at the edge, and no micro-relief to break it up. Metal is
-      // milled; mercury is poured.
       bool merc = uMat > 2.5;
-      float rough = merc ? .035 : clamp(uRough, .04, .95);
-      vec3 Nm = merc
-        ? normalize(vec3(n * (.62 + .38 * bevel) * (.35 + .65 * lift), max(.12, 1. - bevel * .85)))
-        : Nb;
-      // brushed: scratch the normal along one axis, and stretch the highlight
-      float aniso = uAniso;
-      if (aniso > .01) {
-        float brush = fbm(vec2(p.x * .9, p.y * 22.)) - .5;
-        Nm = normalize(Nm + vec3(0., brush * aniso * .55, 0.));
-      }
-      float ndv = max(dot(Nm, V), 1e-3);
-      float ndl = max(dot(Nm, Ldir), 0.);
-      vec3 H = normalize(Ldir + V);
-      vec3 R = reflect(-V, Nm);
-      // Sample the environment along the reflected direction, blurred by
-      // roughness. Rough metal must not show a sharp background or it is foil.
-      // Micro-relief across the face: without it the interior is one flat
-      // normal, the reflection never moves, and the panel is a grey rectangle.
-      if (!merc) {
+      if (merc) {
+        // ── mercury ─────────────────────────────────────────────────────
+        // Marched, not painted. The ray enters the slab, and every normal
+        // below comes from the solid's own gradient — which is what makes a
+        // bead read as a bead instead of a rectangle with a chrome gradient
+        // on it. Surface tension does the rest: the footprint rounds toward a
+        // disc, and two panels within reach pull into one body with a neck.
+        float thick = max(uThick, 8.);
+        float tension = clamp(uTension, 0., 1.);
+        vec3 ro = vec3(p, thick * 3.5);
+        vec3 rd = normalize(vec3((p - uMouse) * .00035, -1.));   // a hair of perspective
+        float t = 0., hit = -1.;
+        for (int i = 0; i < 48; i++) {
+          vec3 q = ro + rd * t;
+          float dd = map3(q, tension, thick);
+          if (dd < .35) { hit = t; break; }
+          t += max(dd * .85, .5);
+          if (t > thick * 8.) break;
+        }
+        if (hit < 0.) {
+          a = 0.;                       // the march missed: leave the ground
+        } else {
+          vec3 q = ro + rd * hit;
+          vec3 Nm = normal3(q, tension, thick);
+          float ndv = max(dot(Nm, -rd), 1e-3);
+          float ndl = max(dot(Nm, Ldir), 0.);
+          vec3 H = normalize(Ldir - rd);
+          vec3 R = reflect(rd, Nm);
+
+          float rough = .04;
+          // A real reflection off a real normal, of the studio and of what is
+          // actually behind the bead.
+          vec2 roff = R.xy * 210.;
+          vec3 env = mix(envmap(R, rough), toLinear(seen(p - roff, rough)), .30);
+          vec3 F0 = mix(vec3(.86, .87, .90), toLinear(tcol), talpha);
+          vec3 Fr = F_Schlick(F0, ndv);
+          float aa = max(rough * rough, 1e-4);
+          vec3 sun = F_Schlick(F0, max(dot(H, -rd), 0.))
+                   * D_GGX(max(dot(Nm, H), 0.), aa)
+                   * V_SmithGGX(ndv, ndl, aa) * ndl;
+          vec3 me = env * Fr + sun * 16. * uSpec;
+          me += F0 * .03;
+          plasma = toSrgb(tonemap(me));
+          // The silhouette is the march's, so a bead that has pulled away from
+          // the rectangle actually looks pulled away.
+          a = 1.;
+        }
+      } else {
+        // ── metal ───────────────────────────────────────────────────────
+        // Milled, not poured: flat stock with a cut edge. Still the screen
+        // space path, which is honest for a flat sheet.
+        float rough = clamp(uRough, .04, .95);
+        vec3 Nm = Nb;
+        float aniso = uAniso;
+        if (aniso > .01) {
+          float brush = fbm(vec2(p.x * .9, p.y * 22.)) - .5;
+          Nm = normalize(Nm + vec3(0., brush * aniso * .55, 0.));
+        }
         float mr = fbm(p * .035) - .5;
         Nm = normalize(Nm + vec3(mr * .16, (fbm(p * .035 + 11.) - .5) * .16, 0.));
+        float ndv = max(dot(Nm, V), 1e-3);
+        float ndl = max(dot(Nm, Ldir), 0.);
+        vec3 H = normalize(Ldir + V);
+        vec3 R = reflect(-V, Nm);
+        vec2 roff = R.xy * pow(bevel, .9) * 150. * (1. - rough * .5);
+        vec3 env = mix(envmap(R, rough), toLinear(seen(p - roff, rough)), .22);
+        vec3 F0 = mix(vec3(.95, .93, .88), toLinear(tcol), talpha);
+        vec3 Fr = F_Schlick(F0, ndv);
+        float aa = max(rough * rough, 1e-3);
+        float D = aniso > .01
+          ? D_GGXaniso(max(dot(Nm, H), 0.), dot(vec3(1.,0.,0.), H), dot(vec3(0.,1.,0.), H), aa * (1. + aniso * 3.), aa)
+          : D_GGX(max(dot(Nm, H), 0.), aa);
+        vec3 sun = F_Schlick(F0, max(dot(H, V), 0.)) * D * V_SmithGGX(ndv, ndl, aa) * ndl;
+        vec3 me = env * Fr + sun * 14. * uSpec;
+        me += F0 * .035;
+        plasma = toSrgb(tonemap(me));
       }
-      R = reflect(-V, Nm);
-      vec2 roff = R.xy * pow(bevel, .9) * 150. * (1. - rough * .5);
-      // The studio carries the structure; the page background keeps it part of
-      // the same scene rather than a cutout pasted on top.
-      vec3 env = mix(envmap(R, rough), toLinear(seen(p - roff, rough)), merc ? .30 : .22);
-      vec3 F0 = mix(merc ? vec3(.86, .87, .90) : vec3(.95, .93, .88), toLinear(tcol), talpha);
-      vec3 Fr = F_Schlick(F0, ndv);
-      float aa = max(rough * rough, 1e-3);
-      float D = aniso > .01
-        ? D_GGXaniso(max(dot(Nm, H), 0.), dot(vec3(1.,0.,0.), H), dot(vec3(0.,1.,0.), H), aa * (1. + aniso * 3.), aa)
-        : D_GGX(max(dot(Nm, H), 0.), aa);
-      vec3 sun = F_Schlick(F0, max(dot(H, V), 0.)) * D * V_SmithGGX(ndv, ndl, aa) * ndl;
-      vec3 me = env * Fr + sun * 14. * uSpec;
-      me += F0 * .035;                                  // a floor, so it is never black
-      plasma = toSrgb(tonemap(me));
     } else if (uMat < 4.5) {
       // ── wood ──────────────────────────────────────────────────────────
       // Grain lives in page coordinates, so a panel that resizes keeps its

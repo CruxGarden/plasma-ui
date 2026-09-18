@@ -1093,6 +1093,12 @@ function Api() {
                 "Metal's finish, and how far a highlight stretches along the grain.",
               ],
               [
+                "thickness · tension",
+                "number",
+                "18 · 0",
+                "A panel as a solid: how deep it is, and how hard the material pulls it toward a bead.",
+              ],
+              [
                 "edge · edgeScale · edgeSharpness",
                 "number",
                 "0 · 0.01 · 0",

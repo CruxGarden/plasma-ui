@@ -207,7 +207,7 @@ export const SETTINGS = {
   reducedMotion: false, freezeOnScroll: false, rimColor: "iridescent", rimWidth: 1,
   highlight: 1, edgeLine: 1, shimmer: 1, glow: 1, wash: 1, grain: 1, backgroundBlur: 0,
   material: "plasma", lightDir: [-0.42, -0.62, 0.66], roughness: 0.28, anisotropy: 0,
-  edge: 0, edgeScale: 0.01, edgeSharpness: 0,
+  edge: 0, edgeScale: 0.01, edgeSharpness: 0, thickness: 18, tension: 0,
   viscosity: 0.5, stretch: 1, flow: 0,
   tint: "#ffffff", opacity: 0, frost: 0, elevation: 0.35, maxSurfaces: 4,
   background: null,

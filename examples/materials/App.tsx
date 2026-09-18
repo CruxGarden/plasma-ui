@@ -67,6 +67,50 @@ const OPAQUE: MaterialName[] = ["wood", "stone", "metal"];
  * the material or the wallpaper. Judge against a flat colour first; the field
  * is still here to check they survive it.
  */
+/**
+ * A material is not a skin, so it brings its own physics as well as its own
+ * shading: how thick it is as a solid, how hard it pulls its shape toward a
+ * bead, how eagerly two of them merge, and how it moves when dragged.
+ */
+const PHYSICS: Record<
+  MaterialName,
+  {
+    thickness: number;
+    tension: number;
+    blend: number;
+    viscosity: number;
+    stretch: number;
+  }
+> = {
+  plasma: { thickness: 18, tension: 0, blend: 24, viscosity: 0.5, stretch: 1 },
+  crystal: {
+    thickness: 26,
+    tension: 0,
+    blend: 14,
+    viscosity: 0.9,
+    stretch: 0.15,
+  },
+  metal: { thickness: 10, tension: 0, blend: 8, viscosity: 0.85, stretch: 0.2 },
+  // Mercury's surface tension is seven times water's: it wants to be a
+  // sphere, and two beads within reach pull into one body.
+  mercury: {
+    thickness: 30,
+    tension: 0.9,
+    blend: 54,
+    viscosity: 0.2,
+    stretch: 1.6,
+  },
+  wood: { thickness: 16, tension: 0, blend: 6, viscosity: 1, stretch: 0 },
+  stone: { thickness: 22, tension: 0, blend: 4, viscosity: 1, stretch: 0 },
+  cloud: {
+    thickness: 40,
+    tension: 0.35,
+    blend: 60,
+    viscosity: 0.15,
+    stretch: 2.2,
+  },
+};
+
 const GROUNDS: { name: string; value: string | undefined }[] = [
   { name: "Slate", value: "#16191d" },
   { name: "Paper", value: "#d9d4cb" },
@@ -111,6 +155,7 @@ export function App() {
   const [frost, setFrost] = useState(0.3);
   const [shape, setShape] = useState(SHAPE.plasma);
   const [ground, setGround] = useState(GROUNDS[0]);
+  const phys = PHYSICS[material];
 
   const pick = (m: MaterialName) => {
     setMaterial(m);
@@ -135,12 +180,16 @@ export function App() {
       lightDir={lightDir}
       roughness={roughness}
       anisotropy={anisotropy}
+      thickness={phys.thickness}
+      tension={phys.tension}
+      viscosity={phys.viscosity}
+      stretch={phys.stretch}
       edge={shape.edge}
       edgeScale={shape.edgeScale}
       edgeSharpness={shape.sharp}
       radius={shape.radius}
       frost={material === "plasma" || material === "crystal" ? frost : 0}
-      blend={24}
+      blend={phys.blend}
       elevation={material === "cloud" ? 0 : 0.4}
       grain={0}
       maxSurfaces={12}

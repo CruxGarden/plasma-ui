@@ -48,6 +48,10 @@ export interface RendererSettings {
   edgeScale: number;
   /** 0 rolls the displaced edge, 1 breaks it into flats and points. */
   edgeSharpness: number;
+  /** How thick a panel is as a solid, in CSS px. Only the marched materials use it. */
+  thickness: number;
+  /** Surface tension: how hard the material pulls its own shape toward a bead. */
+  tension: number;
   /** 0 = watery and bouncy, 1 = thick and slow. */
   viscosity: number;
   /** How far the surface trails behind moving panels. 0 = no trailing. */
@@ -139,7 +143,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -869,6 +873,10 @@ export class PlasmaRenderer {
       gl.uniform1i(u.uCount, list.length);
       gl.uniform4fv(u.uRip, this.RP);
       gl.uniform3fv(u.uA, this.colors[0]); gl.uniform3fv(u.uB, this.colors[1]); gl.uniform3fv(u.uC, this.colors[2]);
+      // Shared with the mask and tint passes: the silhouette has to be the
+      // same shape the composite marches, or it clips it.
+      gl.uniform1f(u.uTension, s.tension);
+      gl.uniform1f(u.uThick, s.thickness);
     };
 
     const bl = this.progs.blur;
@@ -1011,6 +1019,8 @@ export class PlasmaRenderer {
     gl.uniform1f(c.u.uEdge, s.edge);
     gl.uniform1f(c.u.uEdgeScale, s.edgeScale);
     gl.uniform1f(c.u.uEdgeSharp, s.edgeSharpness);
+    gl.uniform1f(c.u.uThick, s.thickness);
+    gl.uniform1f(c.u.uTension, s.tension);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.rtC.tex);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.rtA.tex);
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.rtT.tex);

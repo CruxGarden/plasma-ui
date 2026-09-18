@@ -67,6 +67,10 @@ export interface PlasmaProviderProps {
   edgeScale?: number;
   /** 0 rolls the displaced edge, 1 breaks it into flats and points. Default 0. */
   edgeSharpness?: number;
+  /** How thick a panel is as a solid, in CSS px. The marched materials light a body of this depth. Default 18. */
+  thickness?: number;
+  /** Surface tension: how hard a material pulls its own shape toward a bead, and how eagerly two merge. Default 0. */
+  tension?: number;
   /** Blur the background itself, in CSS px, 0-40. Softens the whole field, unlike `frost`, which blurs only what a frosted surface sees. Default 0. */
   backgroundBlur?: number;
   /** How thick the material feels: 0 is watery and bouncy, 1 is slow like syrup. Also scales drag and snap springs. Default 0.5. */
@@ -255,7 +259,7 @@ export function PlasmaProvider({
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
   shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0,
   material = "plasma", lightDir = [-0.42, -0.62, 0.66], roughness = 0.28, anisotropy = 0,
-  edge = 0, edgeScale = 0.01, edgeSharpness = 0,
+  edge = 0, edgeScale = 0.01, edgeSharpness = 0, thickness = 18, tension = 0,
   pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
   freezeOnScroll = false, canvas = true,
 }: PlasmaProviderProps) {
@@ -273,7 +277,7 @@ export function PlasmaProvider({
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
     pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
     rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur,
-    material, lightDir, roughness, anisotropy, edge, edgeScale, edgeSharpness,
+    material, lightDir, roughness, anisotropy, edge, edgeScale, edgeSharpness, thickness, tension,
     viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };
   const settingsRef = useLatest(settings);
