@@ -105,7 +105,7 @@ layout(location = 1) out vec4 o2;
 void main(){
   vec2 p = fragPos();
   float m = smoothstep(1.5, -1.5, scene(p));
-  vec4 acc = vec4(0.); float fr = 0.; float el = 0.; float wsum = 0.;
+  vec4 acc = vec4(0.); float fr = 0.; float el = 0.; float wsum = 0.; float near = 1e9;
   for(int i=0;i<uCount;i++){
     if(uF[i] < .005) continue;
     vec2 h = uP[i].zw * uF[i];
@@ -113,10 +113,14 @@ void main(){
     float d = sdBoxG(p - uP[i].xy, h, min(uR[i], vec4(min(h.x, h.y))), rmax).x;
     float w = exp(-max(d, 0.) / 18.) * (1. + smoothstep(0., -24., d) * 4.);
     acc += uT[i] * w; fr += uFr[i] * w; el += uEl[i] * w; wsum += w;
+    near = min(near, d);
   }
   vec4 t = wsum > 0. ? acc / wsum : vec4(0.);
   o = vec4(t.rgb * m, t.a * m);
-  o2 = vec4((wsum > 0. ? fr / wsum : 0.) * m, (wsum > 0. ? el / wsum : 0.) * m, 0., 1.);
+  // .b is how near a registered surface this pixel is. The composite divides
+  // it by the silhouette to tell a panel from an ambient drop, which is in the
+  // silhouette but belongs to no surface.
+  o2 = vec4((wsum > 0. ? fr / wsum : 0.) * m, (wsum > 0. ? el / wsum : 0.) * m, smoothstep(40., 0., near) * m, 1.);
 }`;
 
 /** Pass 2: separable Gaussian blur (13 taps via linear sampling). */
@@ -289,6 +293,14 @@ void main(){
     float fres = pow(bevel, 5. / max(uRimWidth, .05)) * slope;
     // rim color: 0 iridescent, 1 solid color, 2 each surface's tint
     vec3 rimCol = pal(dot(n, L)*.35*slope + depth*.8 + uTime*.04 + uEnergy*.3);
+    // Ambient drops belong to no surface, so the tint pass leaves them out of
+    // .b while the silhouette still holds them. That difference is how they
+    // are found - and they take a hue sweep of their own, one turn of the
+    // palette every ~80 seconds, instead of resting on a single colour.
+    if (uAmbient > 0.) {
+      float drop = clamp(1. - texture(uFrost, uv).b / msk, 0., 1.);
+      rimCol = mix(rimCol, pal(uTime * .0125 + depth * .15), drop);
+    }
     float facing = .75 + .5 * max(dot(n, L), 0.) * slope;
     if (uRimMode > .5 && uRimMode < 1.5) rimCol = uRimColor * facing * 1.4;
     else if (uRimMode > 1.5) rimCol = tcol * facing * 1.4;
