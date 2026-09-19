@@ -66,6 +66,9 @@ export function App() {
 | `backgroundBlur`           | `number`                                 | `0`            | Blur the background itself, in CSS px (0-40). Unlike `frost`, which blurs only what a frosted surface sees, this softens the whole field                                              |
 | `ground`                   | `"field" \| "clear"`                     | `"field"`      | What the canvas shows where there is no surface. `"clear"` leaves it transparent, so a second provider's canvas can sit above other content (a dialog above a scrim) and draw only its surfaces; pass the first provider's canvas as its `background` and the surfaces refract it |
 | `preserveDrawingBuffer`    | `boolean`                                | `false`        | Keep each frame after it is shown so another provider can sample this canvas as its `background`. Fixed at creation |
+| `formIn` | `boolean` | `true` | A new surface forms in — grows from nothing — or simply appears |
+| `formSpeed` | `number` | `1` | How fast a surface forms in and out: `1` settles in about a quarter second, `2` in an eighth, `0.5` in a half |
+| `formOut` | `boolean` | `false` | A removed surface forms out — shrinks to nothing from where it was — or simply vanishes |
 While a surface forms in (about half a second, never under reduced motion) its element carries `data-plasma-forming` (`FORMING_ATTR`) and dispatches `plasmaforming` then `plasmaformed` (`FORMING_EVENT`, `FORMED_EVENT`; bubbling, `detail.id`). Style the children off the attribute, or listen for the events, to have the contents arrive after the material: `[data-plasma-forming] > * { opacity: 0 }` with a transition on opacity. `<Plasma>` wraps the events as `onForming` / `onFormed`; a surface registered by hand gets them on its element.
 
 | `material`                 | `MaterialName`                           | `"plasma"`     | What the surfaces are made of: `plasma`, `crystal`, `metal`, `wood`, `stone` or `cloud`. Every material shares the same geometry, springs and fusing and differs only in how it is shaded - see [`examples/materials`](examples/materials) |
@@ -78,6 +81,7 @@ While a surface forms in (about half a second, never under reduced motion) its e
 | `thickness`                | `number`                                 | `18`           | How thick a panel is **as a solid**, in CSS px. The marched materials light a body of this depth rather than shading a flat card                                                      |
 | `tension`                  | `number`                                 | `0`            | Surface tension: how hard the material pulls its own shape toward a bead, and how eagerly two of them merge. `mercury` runs high                                                      |
 | `pointerDrop`              | `boolean`                                | `true`         | Liquid drop that follows the pointer                                                                                                                                                 |
+| `pointerPull` | `boolean` | `true` | The surface swells toward the pointer as it nears an edge. Was part of `pointerDrop`; its own switch now, so the material still answers the pointer with the bead off |
 | `ambientDrops`             | `boolean`                                | `false`        | Decorative orbiting drops                                                                                                                                                            |
 | `grid`, `magnet`           | `number`                                 | `24`, `40`     | Snap grid size and edge latch distance                                                                                                                                               |
 | `quality`                  | `number`                                 | `1.25`         | Maximum canvas pixel ratio                                                                                                                                                           |
@@ -188,7 +192,7 @@ border or shadow of its own: the rim is its edge and the elevation its shadow.
 
 ## Contents after the material
 
-A surface forms in over about half a second when it registers. Content drawn
+A surface forms in over about a quarter second when it registers (`formSpeed` scales it, `formIn={false}` skips it, and `formOut` runs the same spring backwards when a surface is removed). Content drawn
 on top of it from the first frame looks as if it arrived before its panel,
 so the form-in is observable: the element carries `data-plasma-forming`
 (`FORMING_ATTR`) while it runs and dispatches `plasmaforming` then

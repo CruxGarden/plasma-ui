@@ -37,6 +37,7 @@ interface Settings {
   backgroundBlur: number;
   smoothness: number;
   pointerDrop: boolean;
+  pointerPull: boolean;
   ambientDrops: boolean;
   grid: number;
   magnet: number;
@@ -72,6 +73,7 @@ const DEFAULTS: Settings = {
   backgroundBlur: 0,
   smoothness: 1,
   pointerDrop: true,
+  pointerPull: true,
   ambientDrops: false,
   grid: 24,
   magnet: 40,
@@ -350,6 +352,7 @@ export function App() {
       grain={s.grain}
       backgroundBlur={s.backgroundBlur}
       pointerDrop={s.pointerDrop}
+      pointerPull={s.pointerPull}
       ambientDrops={s.ambientDrops}
       grid={s.grid}
       magnet={s.magnet}
@@ -1117,6 +1120,12 @@ function Api() {
                 "Keep each frame after it is shown, so another provider can sample this canvas as its background. Fixed at creation.",
               ],
               [
+                "formIn · formSpeed · formOut",
+                "boolean · number · boolean",
+                "true · 1 · false",
+                "A new surface forms in (or just appears); how fast, 1 being a quarter second; and whether a removed one forms out from where it was.",
+              ],
+              [
                 "ground",
                 '"field" | "clear"',
                 '"field"',
@@ -1127,6 +1136,12 @@ function Api() {
                 "boolean",
                 "true",
                 "Liquid drop under the pointer.",
+              ],
+              [
+                "pointerPull",
+                "boolean",
+                "true",
+                "The surface swells toward the pointer near an edge. Its own switch, apart from the drop.",
               ],
               [
                 "ambientDrops",

@@ -12,7 +12,7 @@ export interface ShaderSet { maskFrag: string; tintFrag: string; blurFrag: strin
 export function makeShaders(MAX_SHAPES: number): ShaderSet {
 const common = `
 precision highp float;
-uniform vec2 uRes; uniform vec4 uView; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uAmbient, uScroll, uVisc, uFlow, uTension, uThick;
+uniform vec2 uRes; uniform vec4 uView; uniform float uScale, uTime, uGoo, uEnergy, uLight, uMouseAmt, uDropR, uPull, uAmbient, uScroll, uVisc, uFlow, uTension, uThick;
 uniform vec2 uMouse;
 uniform vec4 uP[${MAX_SHAPES}]; uniform vec4 uR[${MAX_SHAPES}]; uniform float uF[${MAX_SHAPES}]; uniform vec4 uT[${MAX_SHAPES}]; uniform float uFr[${MAX_SHAPES}]; uniform float uEl[${MAX_SHAPES}]; uniform float uSolo[${MAX_SHAPES}];
 uniform int uCount;
@@ -69,10 +69,12 @@ float scene(vec2 p){
     d = smin(d, length(p - home - vec2(cos(t*1.7+2.),sin(t*.9+1.))*90.) - 26., uGoo);
     d = smin(d, length(p - home - vec2(sin(t*.7),cos(t*1.1))*40.) - 20., uGoo);
   }
-  if(uDropR > 0.){
-    d = smin(d, length(p-uMouse) - uDropR*uMouseAmt, 18.);
+  // The pointer, two ways: the bead that follows it (uDropR), and the pull —
+  // the surface swelling toward it as it nears an edge (uPull). Each its own.
+  if(uDropR > 0.) d = smin(d, length(p-uMouse) - uDropR*uMouseAmt, 18.);
+  if(uPull > 0.){
     float md = length(p-uMouse);
-    d -= 3. * uMouseAmt * exp(-md*md/4000.);
+    d -= 3. * uPull * uMouseAmt * exp(-md*md/4000.);
   }
   for(int i=0;i<${MAX_PULSES};i++){
     float age = uTime - uRip[i].z;

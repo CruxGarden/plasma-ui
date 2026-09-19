@@ -73,6 +73,12 @@ export interface PlasmaProviderProps {
   tension?: number;
   /** Blur the background itself, in CSS px, 0-40. Softens the whole field, unlike `frost`, which blurs only what a frosted surface sees. Default 0. */
   backgroundBlur?: number;
+  /** Whether a new surface forms in — grows from nothing over the form-in — or simply appears. Default true. */
+  formIn?: boolean;
+  /** How fast a surface forms in and out: 1 settles in about a quarter second, 2 in an eighth, 0.5 in a half. Default 1. */
+  formSpeed?: number;
+  /** Whether a removed surface forms out — shrinks to nothing from where it was — or simply vanishes. Default false. */
+  formOut?: boolean;
   /**
    * What the canvas shows where there is no surface. "field" paints the
    * background everywhere. "clear" leaves it transparent, so this provider's
@@ -109,6 +115,8 @@ export interface PlasmaProviderProps {
   smoothness?: number;
   /** Show a liquid drop that follows the pointer. Default true. */
   pointerDrop?: boolean;
+  /** The surface swells toward the pointer as it nears an edge. Default true. Used to ride along with `pointerDrop`; now its own switch, so the material still answers the pointer with the bead off. */
+  pointerPull?: boolean;
   /** Decorative drops orbiting near the bottom right. Default false. */
   ambientDrops?: boolean;
   /** Grid cell size used when a draggable panel snaps. Default 24. */
@@ -272,9 +280,10 @@ export function PlasmaProvider({
   children, mood = "tidal", theme = "auto", blend, refraction = 1, dispersion = 1, rim = 1, smoothness = 1,
   background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
   shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0, ground = "field", preserveDrawingBuffer = false,
+  formIn = true, formSpeed = 1, formOut = false,
   material = "plasma", lightDir = [-0.42, -0.62, 0.66], roughness = 0.28, anisotropy = 0,
   edge = 0, edgeScale = 0.01, edgeSharpness = 0, thickness = 18, tension = 0,
-  pointerDrop = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
+  pointerDrop = true, pointerPull = true, ambientDrops = false, grid = 24, magnet = 40, quality = 1.25, maxSurfaces = 16, zIndex = -1,
   freezeOnScroll = false, canvas = true,
 }: PlasmaProviderProps) {
   // The canvas arrives through a callback ref - from the one below, or from a
@@ -289,8 +298,8 @@ export function PlasmaProvider({
 
   const settings: RendererSettings = {
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
-    pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
-    rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur, ground, preserveDrawingBuffer,
+    pointerDrop: pointerDrop && !reducedMotion, pointerPull, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
+    rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur, ground, preserveDrawingBuffer, formIn, formSpeed, formOut,
     material, lightDir, roughness, anisotropy, edge, edgeScale, edgeSharpness, thickness, tension,
     viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };

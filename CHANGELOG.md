@@ -2,12 +2,22 @@
 
 ## Unreleased
 
-### The form-in is twice as quick
+### The form-in is twice as quick, and yours to set
 
 - **Changed:** a surface forms in over about a quarter second instead of
   half — the spring is four times stiffer with the damping raised to match,
   so it still does not overshoot. A workspace of panes arriving together
   read as slow at the old pace.
+- **Added:** `formIn` (default true) turns the form-in off so a surface
+  simply appears; `formSpeed` (default 1) scales it, 2 being an eighth of a
+  second and 0.5 a half; `formOut` (default false) runs the same spring
+  backwards when a surface is removed, from the box it last had — its
+  element is usually gone by then — and only then frees the slot. Snapping
+  ignores a surface on its way out.
+- **Added:** `pointerPull` (default true). The swell of the surface toward
+  the pointer as it nears an edge used to be gated on `pointerDrop`, so
+  turning the bead off also stopped the material answering the pointer.
+  It is its own switch now; with `pointerDrop={false}` the pull stays.
 
 ### A clear ground, so a second provider can sit above a scrim
 

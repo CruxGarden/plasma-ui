@@ -10,6 +10,8 @@ export interface RendererSettings {
   rim: number;
   smoothness: number;
   pointerDrop: boolean;
+  /** The surface swells toward the pointer as it nears an edge. */
+  pointerPull: boolean;
   ambientDrops: boolean;
   theme: "auto" | "light" | "dark";
   quality: number;
@@ -81,6 +83,12 @@ export interface RendererSettings {
   frost: number;
   /** Default elevation, 0 (flat, no shadow) to 1 (floating high). */
   elevation: number;
+  /** Whether a new surface forms in (grows from nothing) or simply appears. */
+  formIn: boolean;
+  /** How fast the form-in and form-out run: 1 settles in about a quarter second, 2 in an eighth, 0.5 in a half. */
+  formSpeed: number;
+  /** Whether a removed surface forms out (shrinks to nothing) or simply vanishes. */
+  formOut: boolean;
   /** Maximum visible surfaces, compiled into the shaders (fixed at creation). */
   maxSurfaces: number;
   /** Background: CSS color, image URL, or a live img/canvas/video source (null for the procedural mood field). */
@@ -152,6 +160,8 @@ interface Rec extends ShapeOptions {
   id: number;
   el: HTMLElement;
   form: number; formV: number; removing: boolean;
+  /** The box a removing surface shrinks from — its element is gone by then. */
+  removeBox: Box | null;
   /** True while `data-plasma-forming` is on the element (the form-in is still running). */
   forming: boolean;
   lx: number; ly: number;
@@ -179,7 +189,7 @@ interface Rec extends ShapeOptions {
 type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> };
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
-const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
+const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uPull", "uAmbient", "uScroll",
   "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
@@ -419,14 +429,14 @@ export class PlasmaRenderer {
   register(el: HTMLElement, o: ShapeOptions, onJoin?: (j: boolean) => void, onSides?: (sides: JoinedSides) => void): ShapeHandle {
     const id = this.nextId++;
     const rec: Rec = {
-      id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false, forming: false,
+      id, el, ...o, form: this.settings.reducedMotion || !this.settings.formIn ? 1 : 0, formV: 0, removing: false, removeBox: null, forming: false,
       lx: 0, ly: 0, leanCss: "", scaleCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
     // While the surface forms in, the element says so, so its contents can
     // wait for the material (see FORMING_ATTR). Not under reduced motion,
     // where there is no form-in to wait for.
-    if (!this.settings.reducedMotion && typeof el.setAttribute === "function") {
+    if (!this.settings.reducedMotion && this.settings.formIn && typeof el.setAttribute === "function") {
       rec.forming = true; el.setAttribute(FORMING_ATTR, ""); dispatch(el, FORMING_EVENT, id);
     } else dispatch(el, FORMED_EVENT, id);
     this.recs.set(id, rec);
@@ -437,7 +447,18 @@ export class PlasmaRenderer {
       setDragging: on => { rec.dragging = on; },
       leanOffset: () => ({ x: rec.lx, y: rec.ly }),
       isJoined: () => rec.joined,
-      remove: () => { el.style.translate = ""; el.style.scale = ""; if (rec.forming) el.removeAttribute(FORMING_ATTR); this.recs.delete(id); },
+      remove: () => {
+        el.style.translate = ""; el.style.scale = "";
+        if (rec.forming) { rec.forming = false; el.removeAttribute(FORMING_ATTR); }
+        // Form out: keep drawing from the last box while the spring takes the
+        // surface to nothing; the element itself is usually gone already.
+        const box = rec.box ?? (el.isConnected ? elementBox(el) : null);
+        if (this.settings.formOut && !this.settings.reducedMotion && !this.destroyed && box && rec.form > 0.05) {
+          rec.removing = true; rec.removeBox = box; rec.fuse = false; rec.dragging = false; rec.layoutBox = null;
+          return;
+        }
+        this.recs.delete(id);
+      },
     };
   }
 
@@ -449,6 +470,7 @@ export class PlasmaRenderer {
   layoutBoxes(excludeId?: number, fusingOnly = false, group?: string | null): Box[] {
     const out: Box[] = [];
     this.recs.forEach(r => {
+      if (r.removing) return;
       if (r.id === excludeId) return;
       if (fusingOnly && r.fuse === false) return;
       if (group !== undefined && (r.group ?? null) !== group) return;
@@ -763,7 +785,18 @@ export class PlasmaRenderer {
     const rg = this.region;
     const top = -rg.oy - 80, bottom = rg.h - rg.oy + 80, left = -rg.ox - 80, right = rg.w - rg.ox + 80;
     const list: Rec[] = [];
+    const sp = Math.max(0.1, Math.min(10, s.formSpeed || 1));
+    const k = 680 * sp * sp, c = 52 * sp; // the same critical damping at every speed
     this.recs.forEach(r => {
+      if (r.removing) {
+        // Forming out: the spring runs to zero from the box it last had.
+        r.formV += (k * (0 - r.form) - c * r.formV) * dt;
+        r.form += r.formV * dt;
+        if (r.form < 0.02) { this.recs.delete(r.id); return; }
+        r.box = r.removeBox;
+        list.push(r);
+        return;
+      }
       if (!r.el.isConnected) return;
       if (!s.reducedMotion) {
         // Critically damped: surfaces form in without overshooting. At the
@@ -772,7 +805,7 @@ export class PlasmaRenderer {
         // (the same ratio) settles in about a quarter second; the 170 / 26 it
         // shipped with took half a second, which read as slow once a whole
         // workspace of panes arrived at once.
-        r.formV += (680 * (1 - r.form) - 52 * r.formV) * dt;
+        r.formV += (k * (1 - r.form) - c * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
       if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); dispatch(r.el, FORMED_EVENT, r.id); }
@@ -911,6 +944,7 @@ export class PlasmaRenderer {
       gl.uniform1f(u.uLight, light);
       gl.uniform1f(u.uMouseAmt, this.mouse.amt);
       gl.uniform1f(u.uDropR, s.pointerDrop ? 15 : 0);
+      gl.uniform1f(u.uPull, s.pointerPull && !s.reducedMotion ? 1 : 0);
       gl.uniform1f(u.uAmbient, s.ambientDrops ? 1 : 0);
       // 1:1 where pinning is on, so the pinned image and the next live frame
       // agree; the region origin keeps the field continuous across the runway.
