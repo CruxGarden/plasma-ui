@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### The highlight has a sharpness
+
+- **Added:** `highlightSharpness` (0-1, default 0). The pointer highlight on
+  the plasma material was one broad, matte glow; at 1 it is a small, hard
+  glint as on water, with the gain raised so a tight lobe stays visible. The
+  other materials light themselves from `roughness` and ignore it.
+
 ### A clear ground, so a second provider can sit above a scrim
 
 The material was one canvas behind everything, so anything drawn above a

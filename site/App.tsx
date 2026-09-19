@@ -350,6 +350,7 @@ export function App() {
       rimColor={rimColorOf(s)}
       rimWidth={s.rimWidth}
       highlight={s.highlight}
+      highlightSharpness={s.highlightSharpness}
       edgeLine={s.edgeLine}
       shimmer={s.shimmer}
       glow={s.glow}
@@ -866,6 +867,14 @@ function Playground({
               onChange={(v) => set("highlight", v)}
             />
             <Slider
+              label="Highlight sharpness"
+              min={0}
+              max={1}
+              step={0.05}
+              value={s.highlightSharpness}
+              onChange={(v) => set("highlightSharpness", v)}
+            />
+            <Slider
               label="Edge line"
               min={0}
               max={2}
@@ -1055,6 +1064,12 @@ function Api() {
                 "number",
                 "1",
                 "Pointer-facing highlight. 0 = off.",
+              ],
+              [
+                "highlightSharpness",
+                "number",
+                "0",
+                "How tight that highlight is: 0 the broad matte glow, 1 a small hard glint as on water. Plasma only.",
               ],
               ["edgeLine", "number", "1", "Thin outline. 0 = off."],
               [
