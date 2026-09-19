@@ -22,6 +22,8 @@ export interface RendererSettings {
   rimWidth: number;
   /** Pointer-facing highlight strength. */
   highlight: number;
+  /** How tight that highlight is: 0 the broad matte glow, 1 a small hard glint as on water. Plasma material only. */
+  highlightSharpness: number;
   /** Thin edge line strength. */
   edgeLine: number;
   /** Slow iridescent sheen across the body of each surface. 0 = none. */
@@ -180,7 +182,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uSpecSharp", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -1054,6 +1056,7 @@ export class PlasmaRenderer {
     gl.uniform3fv(c.u.uRimColor, mode === 1 ? this.rgb(s.rimColor) : [1, 1, 1]);
     gl.uniform1f(c.u.uRimWidth, s.rimWidth);
     gl.uniform1f(c.u.uSpec, s.highlight);
+    gl.uniform1f(c.u.uSpecSharp, Math.min(1, Math.max(0, s.highlightSharpness)));
     gl.uniform1f(c.u.uHair, s.edgeLine);
     gl.uniform1f(c.u.uShim, s.shimmer);
     gl.uniform1f(c.u.uGlow, s.glow);

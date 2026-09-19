@@ -29,6 +29,7 @@ interface Settings {
   rimHex: string;
   rimWidth: number;
   highlight: number;
+  highlightSharpness: number;
   edgeLine: number;
   shimmer: number;
   glow: number;
@@ -64,6 +65,7 @@ const DEFAULTS: Settings = {
   rimHex: "#9ff3e4",
   rimWidth: 1,
   highlight: 1,
+  highlightSharpness: 0,
   edgeLine: 1,
   shimmer: 1,
   glow: 1,
@@ -101,6 +103,7 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 1,
       rimWidth: 1,
       highlight: 1,
+      highlightSharpness: 0,
       shimmer: 1,
       glow: 1,
       wash: 1,
@@ -133,6 +136,7 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 0.25,
       rimWidth: 0.7,
       highlight: 0.4,
+      highlightSharpness: 0,
       shimmer: 0.6,
       glow: 0.5,
       wash: 1,
@@ -164,6 +168,7 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 0.5,
       rimWidth: 0.6,
       highlight: 0,
+      highlightSharpness: 0,
       shimmer: 0,
       glow: 0,
       wash: 0,
@@ -199,6 +204,7 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       wash: 0,
       grain: 0,
       highlight: 0,
+      highlightSharpness: 0,
       edgeLine: 0.35, // a hairline is what still reads as an edge once the rim is gone
       rimWidth: 1,
       backgroundBlur: 0,
@@ -257,6 +263,7 @@ const CONFIGS: { name: string; blurb: string; patch: Partial<Settings> }[] = [
       rim: 1.3,
       rimWidth: 1.4,
       highlight: 1,
+      highlightSharpness: 0,
       shimmer: 1.6,
       glow: 1.4,
       wash: 1,

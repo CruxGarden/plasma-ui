@@ -22,6 +22,8 @@ export interface PlasmaProviderProps {
   rimWidth?: number;
   /** Strength of the highlight that faces the pointer. 0 turns it off. Default 1. */
   highlight?: number;
+  /** How tight that highlight is, 0-1: 0 the broad, matte glow (the default), 1 a small hard glint as on water. Plasma material only. */
+  highlightSharpness?: number;
   /** Strength of the thin line along the outline. 0 turns it off. Default 1. */
   edgeLine?: number;
   /**
@@ -270,7 +272,7 @@ export function PlasmaCanvas({ className, style, zIndex = -1 }: PlasmaCanvasProp
 
 export function PlasmaProvider({
   children, mood = "tidal", theme = "auto", blend, refraction = 1, dispersion = 1, rim = 1, smoothness = 1,
-  background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, edgeLine = 1,
+  background, radius = 26, tint = "#ffffff", opacity = 0, frost = 0, elevation = 0.35, viscosity = 0.5, stretch = 1, flow = 0, rimColor = "iridescent", rimWidth = 1, highlight = 1, highlightSharpness = 0, edgeLine = 1,
   shimmer = 1, glow = 1, wash = 1, grain = 1, backgroundBlur = 0, ground = "field", preserveDrawingBuffer = false,
   material = "plasma", lightDir = [-0.42, -0.62, 0.66], roughness = 0.28, anisotropy = 0,
   edge = 0, edgeScale = 0.01, edgeSharpness = 0, thickness = 18, tension = 0,
@@ -290,7 +292,7 @@ export function PlasmaProvider({
   const settings: RendererSettings = {
     colors: m.colors, blend: blend ?? m.blend, refraction, dispersion, rim, smoothness,
     pointerDrop: pointerDrop && !reducedMotion, ambientDrops, theme, quality, reducedMotion, freezeOnScroll, tint, opacity,
-    rimColor, rimWidth, highlight, edgeLine, shimmer, glow, wash, grain, backgroundBlur, ground, preserveDrawingBuffer,
+    rimColor, rimWidth, highlight, highlightSharpness, edgeLine, shimmer, glow, wash, grain, backgroundBlur, ground, preserveDrawingBuffer,
     material, lightDir, roughness, anisotropy, edge, edgeScale, edgeSharpness, thickness, tension,
     viscosity, stretch, flow, frost, elevation, maxSurfaces, background: background ?? null,
   };

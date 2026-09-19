@@ -206,6 +206,9 @@ const compFrag = `#version 300 es
 ${common}
 uniform sampler2D uH, uS, uTint, uBg, uBgM, uBgH, uFrost;
 uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair, uShim, uGlow, uWash, uGrain;
+// How tight the pointer highlight is on the plasma material: 0 is the broad,
+// matte glow it always had; 1 is a small, hard glint, as on water.
+uniform float uSpecSharp;
 // Which material the surfaces are made of, and the one light every opaque one
 // reads. Glass fakes its lighting off the pointer because you see through it;
 // the moment anything is opaque, two materials disagreeing about where the sun
@@ -582,7 +585,10 @@ void main(){
     refr = mix(refr, tcol * mix(1., .92, uLight) + refr * .08 * (1. - talpha), talpha);
 
     vec2 L = normalize(uMouse - p + vec2(0., -200.));
-    float spec = pow(max(dot(n, L), 0.), 26.) * pow(bevel, 2.) * slope;
+    // The exponent tightens the glint; the gain keeps a tight one visible,
+    // since a narrow lobe puts less light on any one pixel.
+    float ndl = max(dot(n, L), 0.);
+    float spec = pow(ndl, mix(26., 400., uSpecSharp)) * pow(bevel, mix(2., 1.2, uSpecSharp)) * slope * mix(1., 3.2, uSpecSharp);
     float fres = pow(bevel, 5. / max(uRimWidth, .05)) * slope;
     // rim color: 0 iridescent, 1 solid color, 2 each surface's tint
     vec3 rimCol = pal(dot(n, L)*.35*slope + depth*.8 + uTime*.04 + uEnergy*.3);
