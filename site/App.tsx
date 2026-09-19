@@ -1329,6 +1329,9 @@ export function Workspace({ panels }) {
         flush (one piece) or further apart than the blend distance; smaller gaps
         draw as liquid bridging. Up to maxSurfaces (default 16) render at once,
         offscreen ones skipped. Small controls read better as plain HTML on top.
+        A dialog above a scrim gets its own provider with ground="clear" and the
+        first canvas as its background; contents can wait for the form-in with
+        onFormed or the data-plasma-forming attribute.
       </p>
     </section>
   );
@@ -1336,8 +1339,8 @@ export function Workspace({ panels }) {
 
 const LIMITS = [
   {
-    title: "No layers",
-    body: "Overlapping surfaces fuse. Dialogs, menus, and fixed bars go in plain CSS for now - this page's nav is the pattern.",
+    title: "No layers in one canvas",
+    body: "Overlapping surfaces fuse. A dialog above a scrim is a second provider with ground=\"clear\" sampling the first one's canvas; fixed bars over scrolling plasma stay plain CSS - this page's nav is the pattern.",
   },
   {
     title: "No scroll clipping",

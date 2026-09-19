@@ -143,6 +143,69 @@ It takes `className`, `style` and `zIndex`. Note that this places and styles
 the **element**; the renderer still draws the whole viewport. Confining the
 field to a container is [roadmap](#roadmap) work, not something this prop does.
 
+## Above a scrim: a second canvas
+
+The material is one canvas behind everything, so a dialog above a scrim, or a
+menu above the pane it opened from, could never be plasma. Two props make a
+second provider possible on top of the first. The ground keeps its frames
+(`preserveDrawingBuffer`) and hands its canvas out; the overlay draws with a
+clear ground (`ground="clear"`): transparent outside its surfaces, only the
+surfaces, their shadows and rims drawn, and what they refract is the ground
+canvas passed as `background`, sampled exactly so it lines up with the page.
+
+```tsx
+// The ground, once, behind the app.
+<PlasmaProvider mood="tidal" preserveDrawingBuffer canvas={false}>
+  <PlasmaCanvas zIndex={-1} className="ground" />
+  <App />
+</PlasmaProvider>
+
+// A dialog: its own provider inside its own stacking context, the canvas
+// between the scrim and the panel, the panel registered on it.
+function Dialog({ children }) {
+  const ground = document.querySelector("canvas.ground");
+  return (
+    <div className="dialog-root">            {/* position: fixed; inset: 0 */}
+      <div className="scrim" />
+      <PlasmaProvider ground="clear" background={ground} canvas={false}
+        pointerDrop={false} grain={0} glow={0} maxSurfaces={2}>
+        <PlasmaCanvas style={{ position: "absolute", zIndex: 1 }} />
+        <Plasma className="panel" elevation={0.7} style={{ zIndex: 2 }}>
+          {children}
+        </Plasma>
+      </PlasmaProvider>
+    </div>
+  );
+}
+```
+
+Each overlay is a full render pass while it is open, at the same size as the
+ground, plus one texture upload of the ground canvas per frame. Mount it with
+the dialog and unmount it with the dialog; nothing runs while none is open.
+The page under the scrim is not in the sample - WebGL cannot read the DOM -
+but the scrim has already dimmed it to the field. Give the panel no fill,
+border or shadow of its own: the rim is its edge and the elevation its shadow.
+
+## Contents after the material
+
+A surface forms in over about half a second when it registers. Content drawn
+on top of it from the first frame looks as if it arrived before its panel,
+so the form-in is observable: the element carries `data-plasma-forming`
+(`FORMING_ATTR`) while it runs and dispatches `plasmaforming` then
+`plasmaformed` (`FORMING_EVENT`, `FORMED_EVENT`; bubbling, `detail.id`).
+Under reduced motion there is no form-in: no attribute, and `plasmaformed`
+at once. `<Plasma>` wraps the events as `onForming` / `onFormed`.
+
+```css
+/* hold the contents back, then fade them in once the material has arrived */
+[data-plasma-forming] > * { opacity: 0; transition: none; }
+.panel > * { transition: opacity 160ms ease-out; }
+```
+
+```tsx
+<Plasma onFormed={() => setReady(true)}>{ready && <Contents />}</Plasma>
+```
+
 ## Clear as water
 
 Six things give the material a look of its own, and each is a separate
@@ -216,13 +279,14 @@ NOTE: `flow` ripples the outline, so leave it at `0` whenever flush edges should
 - Place surfaces together or further apart than the Blend distance. Smaller gaps render as liquid bridging them.
 - Up to `maxSurfaces` (default 16) draw at once; offscreen panels are skipped first, and the library warns in the console when it has to drop any. Two render passes loop over every slot per pixel, so set this value only as high as you need. Changing it recompiles the shaders, so change it when the layout changes, not per frame.
 - Lean and Pulse use the CSS `translate` and `scale` properties, and Drag uses `transform`. Avoid setting these properties on `Plasma` elements yourself.
-- `prefers-reduced-motion` disables Lean, Pulse, the pointer Drop, and Spring.
+- `prefers-reduced-motion` disables Lean, Pulse, the pointer Drop, and Spring - and the form-in, so `plasmaformed` fires at once.
+- A second provider above a scrim (`ground="clear"`) is a full extra render pass; mount it with the dialog and unmount it with the dialog.
 
 ## Roadmap
 
 Ordered by priority:
 
-1. **Layers** - panels that will stack instead of fusing. For use with dialogs, menus, and such.
+1. **Layers** - panels that will stack instead of fusing. A dialog above a scrim is possible today with a second provider ([above a scrim](#above-a-scrim-a-second-canvas)); true stacking inside one canvas is still to come.
 2. **Drag handles and resize** - will add a `handle` prop for dragging, so panel content can be fully interactive. Also, edge resizing with grid snapping.
 3. **Scroll clipping** - plasma confined to scrollable containers.
 4. **Pluggable Backgrounds** - colors, images, and live canvas/video shipped in 0.1 (`background` prop); custom shaders are next.

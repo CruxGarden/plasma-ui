@@ -35,12 +35,12 @@ docs/demo.gif         README capture.
 
 ## Render pipeline (per frame, renderer.ts `draw`)
 
-0. **Background** -> full-res texture `rtBg`: procedural mood field, or the `background` image (cover-fit, slow swirl + pulse warp; loaded async in `loadBackground`). If any surface has frost > 0: two blurred copies `rtBgM`/`rtBgH` (medium/heavy).
+0. **Background** -> full-res texture `rtBg`: procedural mood field, or the `background` image (cover-fit, slow swirl + pulse warp; loaded async in `loadBackground`). Under `ground: "clear"` (`uClear`) the image/canvas source is sampled **exactly** - no swirl, no pulse warp - so a refraction of it lines up with the page beneath; with no source it is black. If any surface has frost > 0: two blurred copies `rtBgM`/`rtBgH` (medium/heavy).
 1. **Silhouette** (`maskFrag`) -> `rtA` at half res. All shapes as one SDF; smin blending.
    1b. **Tint/frost/elevation** (`tintFrag`, MRT) -> `rtT` (rgb=tint premultiplied, a=opacity) + `rtFr` (r=frost, g=elevation). Distance-weighted per-shape mix so values blend across joins.
 2. **Blurs** (`blurFrag`): light blur of silhouette -> smoothed outline (traced at 0.5 contour, bicubic-sampled in comp); same light blur applied to tint and frost/elevation layers; heavier chain -> `rtC` height field.
 2b. **Background blur** (`backgroundBlur` > 0): the background goes down to half res, through three ping-pong blur pairs, and back into `rtBg`, so every later pass reads the softened field for free. Eight extra passes, and none when it is 0.
-3. **Composite** (`compFrag`): refraction from height-field slope with chromatic dispersion, frost = fade sharp->blurred bg copies, tint mix (opacity 1 = flat color: shimmer and bg-bleed scale by `1 - talpha`), rim (iridescent | solid | per-tint), pointer highlight, elevation-driven shadow (offset+strength from elevation channel; sampled slightly above for the caster), film grain **background only** (`grain = 1 - plasmaAlpha`).
+3. **Composite** (`compFrag`): refraction from height-field slope with chromatic dispersion, frost = fade sharp->blurred bg copies, tint mix (opacity 1 = flat color: shimmer and bg-bleed scale by `1 - talpha`), rim (iridescent | solid | per-tint), pointer highlight, elevation-driven shadow (offset+strength from elevation channel; sampled slightly above for the caster), film grain **background only** (`grain = 1 - plasmaAlpha`). Under `uClear` the final write is `vec4(col * cover/alpha, alpha)` with `alpha = max(cover, shadowDarkness)`: transparent outside the surfaces, the shadow as black at its darkness, the surface itself inside - un-premultiplied, because the context is `premultipliedAlpha: false`.
 
 ### SDF seam rules (do not regress)
 
@@ -73,7 +73,9 @@ docs/demo.gif         README capture.
 - The CSS fallback (`.plasma-fallback`) must keep working: check `supported === false` paths when touching Plasma.tsx.
 - **GL objects created outside `initGL()`** (today: the background texture) are not in `owned`, so they are not rebuilt by a restore and not freed by `destroy()`. Both paths handle `imgTex` explicitly; anything new of that shape needs the same two lines. `tests/renderer.test.mjs` fails if it does not.
 - **Async GL work must check `destroyed`.** The `<canvas>` and its context outlive the renderer, so a callback landing after `destroy()` allocates something nothing can free.
-- `prefers-reduced-motion`: springs jump, lean/pulse/drop/surface-spring off. Preserve on any new motion.
+- `prefers-reduced-motion`: springs jump, lean/pulse/drop/surface-spring off. Preserve on any new motion. The form-in too: `form` starts at 1, no `data-plasma-forming`, `plasmaformed` dispatched from `register`.
+- **The form-in is observable** (`FORMING_ATTR`, `FORMING_EVENT`, `FORMED_EVENT`): `register` sets the attribute and dispatches `plasmaforming`; the frame loop clears it and dispatches `plasmaformed` when `form > 0.985`; `remove()` clears a still-forming element. `dispatch()` guards `CustomEvent` and `dispatchEvent`, because the renderer tests register plain objects as elements.
+- **Two providers on one page** (a clear-ground overlay): the ground needs `preserveDrawingBuffer` (a context attribute, so fixed at creation - a change means a new renderer) or the overlay's per-frame `texImage2D` of the ground canvas reads blank after compositing. The overlay samples the ground through the ordinary `background` path (`srcEl` an HTMLCanvasElement, uploaded every frame). Each provider is a full pipeline; the overlay's `maxSurfaces` should be small.
 - Config precedence for docs: the five nav configs are complete patches; every patch must set any field another patch sets (see `ambientDrops`), or switching tabs leaks state.
 
 ## Workflows
@@ -94,7 +96,7 @@ Docs discipline: README prop tables mirror `dist/*.d.ts`; playground defaults mi
 
 ## Known gaps -> roadmap (README has the user-facing version)
 
-layers (overlaps fuse) -> drag handles + resize -> scroll clipping -> pluggable background -> shapes/rotation. CONTRIBUTING.md frames these as first projects.
+layers (overlaps fuse; a dialog above a scrim is a second clear-ground provider today, true stacking in one canvas is not) -> drag handles + resize -> scroll clipping -> pluggable background -> shapes/rotation. CONTRIBUTING.md frames these as first projects.
 
 ## Publish checklist
 
