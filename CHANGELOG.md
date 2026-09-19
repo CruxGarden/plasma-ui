@@ -12,8 +12,9 @@
   simply appears; `formSpeed` (default 1) scales it, 2 being an eighth of a
   second and 0.5 a half; `formOut` (default false) runs the same spring
   backwards when a surface is removed, from the box it last had — its
-  element is usually gone by then — and only then frees the slot. Snapping
-  ignores a surface on its way out.
+  element is usually gone by then — and only then frees the slot. It runs at
+  1.6× the form-in's pace (leaving reads right quicker than arriving).
+  Snapping ignores a surface on its way out.
 - **Added:** `pointerPull` (default true). The swell of the surface toward
   the pointer as it nears an edge used to be gated on `pointerDrop`, so
   turning the bead off also stopped the material answering the pointer.

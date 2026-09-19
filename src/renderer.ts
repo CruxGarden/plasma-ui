@@ -789,8 +789,9 @@ export class PlasmaRenderer {
     const k = 680 * sp * sp, c = 52 * sp; // the same critical damping at every speed
     this.recs.forEach(r => {
       if (r.removing) {
-        // Forming out: the spring runs to zero from the box it last had.
-        r.formV += (k * (0 - r.form) - c * r.formV) * dt;
+        // Forming out: the spring runs to zero from the box it last had, at
+        // 1.6× the form-in's pace — leaving reads right quicker than arriving.
+        r.formV += (k * 2.56 * (0 - r.form) - c * 1.6 * r.formV) * dt;
         r.form += r.formV * dt;
         if (r.form < 0.02) { this.recs.delete(r.id); return; }
         r.box = r.removeBox;
