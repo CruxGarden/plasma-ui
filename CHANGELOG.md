@@ -16,6 +16,9 @@ provider possible on top of the first.
 - **Added:** `preserveDrawingBuffer` - keep each frame after it is shown so
   another provider can pass this canvas as its `background`. Fixed at
   creation; off by default.
+- **Added:** `data-plasma-forming` (`FORMING_ATTR`) on a surface's element
+  from `register` until its form-in has settled, so a page can hold the
+  contents back and fade them in after the material has arrived.
 - The pair: the first provider with `preserveDrawingBuffer` and a
   `<PlasmaCanvas className="ground" />`; the second, inside the dialog's own
   stacking context, with `ground="clear"` and `background={groundCanvas}`,

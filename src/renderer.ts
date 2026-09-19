@@ -98,6 +98,14 @@ export type MaterialName = (typeof MATERIALS)[number];
 /** Anything the background can be: a CSS color string, an image URL, or an element to sample (canvas and video update live). */
 export type BackgroundSource = string | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement | ImageBitmap;
 
+/**
+ * Set on a surface's element from `register` until its form-in has finished
+ * (about half a second; never under reduced motion). Style the element's
+ * children off it to have the contents arrive after the material:
+ * `[data-plasma-forming] > * { opacity: 0 }` with a transition on opacity.
+ */
+export const FORMING_ATTR = "data-plasma-forming";
+
 export interface ShapeOptions {
   radius: number;
   lean: number;
@@ -132,6 +140,8 @@ interface Rec extends ShapeOptions {
   id: number;
   el: HTMLElement;
   form: number; formV: number; removing: boolean;
+  /** True while `data-plasma-forming` is on the element (the form-in is still running). */
+  forming: boolean;
   lx: number; ly: number;
   /**
    * Last translate and scale written, so an unchanged frame writes nothing.
@@ -397,10 +407,14 @@ export class PlasmaRenderer {
   register(el: HTMLElement, o: ShapeOptions, onJoin?: (j: boolean) => void, onSides?: (sides: JoinedSides) => void): ShapeHandle {
     const id = this.nextId++;
     const rec: Rec = {
-      id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false,
+      id, el, ...o, form: this.settings.reducedMotion ? 1 : 0, formV: 0, removing: false, forming: false,
       lx: 0, ly: 0, leanCss: "", scaleCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
+    // While the surface forms in, the element says so, so its contents can
+    // wait for the material (see FORMING_ATTR). Not under reduced motion,
+    // where there is no form-in to wait for.
+    if (!this.settings.reducedMotion && typeof el.setAttribute === "function") { rec.forming = true; el.setAttribute(FORMING_ATTR, ""); }
     this.recs.set(id, rec);
     return {
       id,
@@ -409,7 +423,7 @@ export class PlasmaRenderer {
       setDragging: on => { rec.dragging = on; },
       leanOffset: () => ({ x: rec.lx, y: rec.ly }),
       isJoined: () => rec.joined,
-      remove: () => { el.style.translate = ""; el.style.scale = ""; this.recs.delete(id); },
+      remove: () => { el.style.translate = ""; el.style.scale = ""; if (rec.forming) el.removeAttribute(FORMING_ATTR); this.recs.delete(id); },
     };
   }
 
@@ -744,6 +758,7 @@ export class PlasmaRenderer {
         r.formV += (170 * (1 - r.form) - 26 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
+      if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); }
       const b = elementBox(r.el);
       r.box = b;
       if (b.w === 0 || b.l > right || b.t > bottom || b.l + b.w < left || b.t + b.h < top) { r.sp.live = false; return; }
