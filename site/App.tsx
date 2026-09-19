@@ -1260,6 +1260,12 @@ function Api() {
                 "Drag lifecycle; onDragEnd gets the settled offset.",
               ],
               [
+                "formIn · formOut",
+                "boolean | null",
+                "null",
+                "This surface forms in / out, or appears and vanishes at once; null follows the provider.",
+              ],
+              [
                 "onJoinChange",
                 "(joined) => void",
                 "",

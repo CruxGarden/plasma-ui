@@ -106,6 +106,7 @@ Accepts all HTML attributes, plus the following:
 | `snap`                                  | `boolean`                | `true`   | Latch to neighbor edges, otherwise the grid                                                                         |
 | `bounds`                                | `RefObject<HTMLElement>` | viewport | Drag area and grid origin                                                                                           |
 | `group`                                 | `string`                 |          | Snap only against surfaces in the same group; surfaces with no group form one group of their own                    |
+| `formIn` / `formOut` | `boolean \| null` | `null` | This surface forms in / out, or appears and vanishes at once; `null` follows the provider |
 | `offset` / `defaultOffset`              | `{ x, y }`               |          | Controlled or initial offset; changes spring into place                                                             |
 | `onDragStart`, `onDragEnd(offset)`      |                          |          | Drag lifecycle; `onDragEnd` gets the settled offset                                                                 |
 | `onJoinChange(joined)`                  |                          |          | Fires when the surface fuses with or separates from a neighbor                                                      |

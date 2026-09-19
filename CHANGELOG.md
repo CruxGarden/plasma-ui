@@ -15,6 +15,10 @@
   element is usually gone by then — and only then frees the slot. It runs at
   1.6× the form-in's pace (leaving reads right quicker than arriving).
   Snapping ignores a surface on its way out.
+- **Added:** per-surface `formIn` / `formOut` (on `<Plasma>` and in
+  `ShapeOptions`, `null` follows the provider), so one surface can stand in
+  for another — a menu's bar drawn on a second canvas — without forming in
+  or shrinking away.
 - **Added:** `pointerPull` (default true). The swell of the surface toward
   the pointer as it nears an edge used to be gated on `pointerDrop`, so
   turning the bead off also stopped the material answering the pointer.

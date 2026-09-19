@@ -50,6 +50,10 @@ export interface PlasmaOwnProps {
   onDragEnd?: (offset: Offset) => void;
   /** Fires when the surface fuses with or separates from a neighbor. */
   onJoinChange?: (joined: boolean) => void;
+  /** This surface forms in, or appears at once; null follows the provider. */
+  formIn?: boolean | null;
+  /** This surface forms out when removed, or vanishes at once; null follows the provider. */
+  formOut?: boolean | null;
   /** Fires as the surface starts forming in (not under reduced motion). The element carries `data-plasma-forming` meanwhile. */
   onForming?: () => void;
   /** Fires once the surface has formed in — at once under reduced motion. Reveal the contents here. */
@@ -110,7 +114,7 @@ type PlasmaInnerProps = PlasmaOwnProps & { as?: React.ElementType } & Record<str
 const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   {
     as: Comp = "div", radius, lean = 10, tint, opacity, frost, elevation, fuse, padding, draggable = false, snap = true, group, bounds,
-    offset, defaultOffset, onDragStart, onDragEnd, onJoinChange, onForming, onFormed,
+    offset, defaultOffset, onDragStart, onDragEnd, onJoinChange, onForming, onFormed, formIn, formOut,
     className, style, children, onPointerDown, onKeyDown, tabIndex, ...rest
   }: PlasmaInnerProps,
   ref,
@@ -146,6 +150,7 @@ const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   const opts: ShapeOptions = {
     radius: r, lean: lean || 0, tint: tint ?? null, opacity: opacity ?? null,
     frost: frost ?? null, elevation: elevation ?? null, fuse, group: group ?? null,
+    formIn: formIn ?? null, formOut: formOut ?? null,
   };
   const optsRef = useLatest(opts);
 

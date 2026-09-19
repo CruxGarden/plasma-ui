@@ -141,6 +141,10 @@ export interface ShapeOptions {
   fuse?: boolean;
   /** Snap only against surfaces carrying the same group. null groups with the other ungrouped surfaces. */
   group?: string | null;
+  /** Per-surface: form in, or appear at once. null follows the provider. */
+  formIn?: boolean | null;
+  /** Per-surface: form out when removed, or vanish at once. null follows the provider. */
+  formOut?: boolean | null;
 }
 
 /** Handle returned by `register`, used by <Plasma>. */
@@ -429,14 +433,14 @@ export class PlasmaRenderer {
   register(el: HTMLElement, o: ShapeOptions, onJoin?: (j: boolean) => void, onSides?: (sides: JoinedSides) => void): ShapeHandle {
     const id = this.nextId++;
     const rec: Rec = {
-      id, el, ...o, form: this.settings.reducedMotion || !this.settings.formIn ? 1 : 0, formV: 0, removing: false, removeBox: null, forming: false,
+      id, el, ...o, form: this.settings.reducedMotion || !(o.formIn ?? this.settings.formIn) ? 1 : 0, formV: 0, removing: false, removeBox: null, forming: false,
       lx: 0, ly: 0, leanCss: "", scaleCss: "", joined: false, dragging: false, layoutBox: null, pulseAt: -1, pulseS: 0, box: null, onJoin, onSides, sidesKey: "",
       sp: { e: [0, 0, 0, 0], v: [0, 0, 0, 0], live: false }, drawn: null, elevNow: -1,
     };
     // While the surface forms in, the element says so, so its contents can
     // wait for the material (see FORMING_ATTR). Not under reduced motion,
     // where there is no form-in to wait for.
-    if (!this.settings.reducedMotion && this.settings.formIn && typeof el.setAttribute === "function") {
+    if (!this.settings.reducedMotion && (o.formIn ?? this.settings.formIn) && typeof el.setAttribute === "function") {
       rec.forming = true; el.setAttribute(FORMING_ATTR, ""); dispatch(el, FORMING_EVENT, id);
     } else dispatch(el, FORMED_EVENT, id);
     this.recs.set(id, rec);
@@ -453,7 +457,7 @@ export class PlasmaRenderer {
         // Form out: keep drawing from the last box while the spring takes the
         // surface to nothing; the element itself is usually gone already.
         const box = rec.box ?? (el.isConnected ? elementBox(el) : null);
-        if (this.settings.formOut && !this.settings.reducedMotion && !this.destroyed && box && rec.form > 0.05) {
+        if ((rec.formOut ?? this.settings.formOut) && !this.settings.reducedMotion && !this.destroyed && box && rec.form > 0.05) {
           rec.removing = true; rec.removeBox = box; rec.fuse = false; rec.dragging = false; rec.layoutBox = null;
           return;
         }
