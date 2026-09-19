@@ -1250,6 +1250,12 @@ function Api() {
                 "",
                 "Fires on fuse or separation.",
               ],
+              [
+                "onForming · onFormed",
+                "() => void",
+                "",
+                "The form-in starts; the form-in has settled (at once under reduced motion). Reveal contents in onFormed.",
+              ],
             ]}
           />
         </div>

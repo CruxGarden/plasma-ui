@@ -105,6 +105,18 @@ export type BackgroundSource = string | HTMLImageElement | HTMLCanvasElement | H
  * `[data-plasma-forming] > * { opacity: 0 }` with a transition on opacity.
  */
 export const FORMING_ATTR = "data-plasma-forming";
+/**
+ * Events a surface's element dispatches (bubbling, so a page can listen at
+ * the document): `plasmaforming` when the form-in starts, `plasmaformed`
+ * when it has settled — at once under reduced motion. `detail.id` is the
+ * surface id. `<Plasma onForming onFormed>` wraps them.
+ */
+export const FORMING_EVENT = "plasmaforming";
+export const FORMED_EVENT = "plasmaformed";
+function dispatch(el: HTMLElement, name: string, id: number) {
+  if (typeof CustomEvent === "undefined" || typeof el.dispatchEvent !== "function") return;
+  el.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: { id } }));
+}
 
 export interface ShapeOptions {
   radius: number;
@@ -414,7 +426,9 @@ export class PlasmaRenderer {
     // While the surface forms in, the element says so, so its contents can
     // wait for the material (see FORMING_ATTR). Not under reduced motion,
     // where there is no form-in to wait for.
-    if (!this.settings.reducedMotion && typeof el.setAttribute === "function") { rec.forming = true; el.setAttribute(FORMING_ATTR, ""); }
+    if (!this.settings.reducedMotion && typeof el.setAttribute === "function") {
+      rec.forming = true; el.setAttribute(FORMING_ATTR, ""); dispatch(el, FORMING_EVENT, id);
+    } else dispatch(el, FORMED_EVENT, id);
     this.recs.set(id, rec);
     return {
       id,
@@ -758,7 +772,7 @@ export class PlasmaRenderer {
         r.formV += (170 * (1 - r.form) - 26 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
-      if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); }
+      if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); dispatch(r.el, FORMED_EVENT, r.id); }
       const b = elementBox(r.el);
       r.box = b;
       if (b.w === 0 || b.l > right || b.t > bottom || b.l + b.w < left || b.t + b.h < top) { r.sp.live = false; return; }

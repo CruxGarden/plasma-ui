@@ -1,7 +1,7 @@
 import React, { forwardRef, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { animateSpring, SpringValue, springValue } from "./spring";
 import { DEV, useIsoLayoutEffect, useLatest, usePlasmaDefaults, usePlasmaRuntime } from "./PlasmaProvider";
-import { JoinedSides, ShapeHandle, ShapeOptions } from "./renderer";
+import { JoinedSides, ShapeHandle, ShapeOptions, FORMING_EVENT, FORMED_EVENT } from "./renderer";
 import { Box, snapBox } from "./snap";
 
 export interface Offset { x: number; y: number }
@@ -50,6 +50,10 @@ export interface PlasmaOwnProps {
   onDragEnd?: (offset: Offset) => void;
   /** Fires when the surface fuses with or separates from a neighbor. */
   onJoinChange?: (joined: boolean) => void;
+  /** Fires as the surface starts forming in (not under reduced motion). The element carries `data-plasma-forming` meanwhile. */
+  onForming?: () => void;
+  /** Fires once the surface has formed in — at once under reduced motion. Reveal the contents here. */
+  onFormed?: () => void;
 }
 
 /**
@@ -106,7 +110,7 @@ type PlasmaInnerProps = PlasmaOwnProps & { as?: React.ElementType } & Record<str
 const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   {
     as: Comp = "div", radius, lean = 10, tint, opacity, frost, elevation, fuse, padding, draggable = false, snap = true, group, bounds,
-    offset, defaultOffset, onDragStart, onDragEnd, onJoinChange,
+    offset, defaultOffset, onDragStart, onDragEnd, onJoinChange, onForming, onFormed,
     className, style, children, onPointerDown, onKeyDown, tabIndex, ...rest
   }: PlasmaInnerProps,
   ref,
@@ -124,6 +128,8 @@ const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   const positioned = draggable || !!offset || !!defaultOffset;
 
   const joinCb = useLatest(onJoinChange);
+  const formingCb = useLatest(onForming);
+  const formedCb = useLatest(onFormed);
   const sidesStore = useConst(createSidesStore);
   const sides = useSyncExternalStore(sidesStore.subscribe, sidesStore.get, noSides);
   const runtimeRef = useLatest(runtime);
@@ -149,6 +155,11 @@ const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
   useIsoLayoutEffect(() => {
     const node = el.current, ren = runtime.renderer;
     if (!node || !ren) return;
+    // The form events come off the element, so they are wired before register fires the first one.
+    const onForming = () => formingCb.current?.();
+    const onFormed = () => formedCb.current?.();
+    node.addEventListener(FORMING_EVENT, onForming);
+    node.addEventListener(FORMED_EVENT, onFormed);
     const h = ren.register(node, optsRef.current, j => joinCb.current?.(j), sidesStore.set);
     if (positioned) {
       h.setLayoutBox(() => {
@@ -163,7 +174,11 @@ const PlasmaInner = forwardRef<HTMLElement, PlasmaInnerProps>(function Plasma(
       });
     }
     handle.current = h;
-    return () => { h.remove(); handle.current = null; };
+    return () => {
+      h.remove(); handle.current = null;
+      node.removeEventListener(FORMING_EVENT, onForming);
+      node.removeEventListener(FORMED_EVENT, onFormed);
+    };
   }, [runtime.renderer, positioned]);
 
   // Layout, not passive: a radius change must reach the renderer in the same

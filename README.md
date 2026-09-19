@@ -66,7 +66,7 @@ export function App() {
 | `backgroundBlur`           | `number`                                 | `0`            | Blur the background itself, in CSS px (0-40). Unlike `frost`, which blurs only what a frosted surface sees, this softens the whole field                                              |
 | `ground`                   | `"field" \| "clear"`                     | `"field"`      | What the canvas shows where there is no surface. `"clear"` leaves it transparent, so a second provider's canvas can sit above other content (a dialog above a scrim) and draw only its surfaces; pass the first provider's canvas as its `background` and the surfaces refract it |
 | `preserveDrawingBuffer`    | `boolean`                                | `false`        | Keep each frame after it is shown so another provider can sample this canvas as its `background`. Fixed at creation |
-While a surface forms in (about half a second, never under reduced motion) its element carries `data-plasma-forming` (`FORMING_ATTR`). Style its children off it to have the contents arrive after the material: `[data-plasma-forming] > * { opacity: 0 }` with a transition on opacity.
+While a surface forms in (about half a second, never under reduced motion) its element carries `data-plasma-forming` (`FORMING_ATTR`) and dispatches `plasmaforming` then `plasmaformed` (`FORMING_EVENT`, `FORMED_EVENT`; bubbling, `detail.id`). Style the children off the attribute, or listen for the events, to have the contents arrive after the material: `[data-plasma-forming] > * { opacity: 0 }` with a transition on opacity. `<Plasma>` wraps the events as `onForming` / `onFormed`; a surface registered by hand gets them on its element.
 
 | `material`                 | `MaterialName`                           | `"plasma"`     | What the surfaces are made of: `plasma`, `crystal`, `metal`, `wood`, `stone` or `cloud`. Every material shares the same geometry, springs and fusing and differs only in how it is shaded - see [`examples/materials`](examples/materials) |
 | `lightDir`                 | `[number, number, number]`               | up-left, front | Where the one light comes from. Every opaque material reads it, so two of them on a page agree about the sun                                                                          |
@@ -105,6 +105,7 @@ Accepts all HTML attributes, plus the following:
 | `offset` / `defaultOffset`              | `{ x, y }`               |          | Controlled or initial offset; changes spring into place                                                             |
 | `onDragStart`, `onDragEnd(offset)`      |                          |          | Drag lifecycle; `onDragEnd` gets the settled offset                                                                 |
 | `onJoinChange(joined)`                  |                          |          | Fires when the surface fuses with or separates from a neighbor                                                      |
+| `onForming()`, `onFormed()` | | | The form-in: starts (not under reduced motion), and has settled (at once under reduced motion) — reveal the contents in `onFormed` |
 
 Everything else you pass goes to the rendered element. `PlasmaProps<C>` is the
 full prop type for `<Plasma as={C}>`; `PlasmaOwnProps` is just the table above,

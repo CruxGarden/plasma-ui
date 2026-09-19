@@ -21,5 +21,5 @@ export { makeShaders, DEFAULT_MAX_SHAPES } from "./shaders";
 export type { BackgroundSource, JoinedSides, RendererSettings, ShapeHandle, ShapeOptions } from "./renderer";
 
 /** The materials a surface can be made of. */
-export { MATERIALS, FORMING_ATTR } from "./renderer";
+export { MATERIALS, FORMING_ATTR, FORMING_EVENT, FORMED_EVENT } from "./renderer";
 export type { MaterialName } from "./renderer";
