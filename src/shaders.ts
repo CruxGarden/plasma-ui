@@ -143,6 +143,7 @@ uniform vec2 uImgRes;
 uniform float uHasImg;
 uniform vec3 uBgColor;
 uniform float uBgSolid;
+uniform float uClear;
 out vec4 o;
 vec3 bg(vec2 p){
   p.y += uScroll;
@@ -176,6 +177,15 @@ void main(){
     o = vec4(uBgColor * (1. + shade), 1.);
     return;
   }
+  if (uHasImg > .5 && uClear > .5) {
+    // a clear ground samples what is beneath it exactly - no swirl, no warp -
+    // so a refraction of it lines up with the page it sits on
+    float sc = max(uView.z / uImgRes.x, uView.w / uImgRes.y);
+    vec2 uv = (p - uView.xy - .5*uView.zw) / (uImgRes * sc) + .5;
+    o = vec4(texture(uImg, clamp(uv, 0., 1.)).rgb, 1.);
+    return;
+  }
+  if (uClear > .5) { o = vec4(0., 0., 0., 1.); return; }
   if (uHasImg > .5) {
     // image background: slow swirl plus the pulse warp above
     vec2 q = bp;
@@ -201,6 +211,9 @@ uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair, uShim, u
 // the moment anything is opaque, two materials disagreeing about where the sun
 // is looks broken in a way no single shader can fix. So there is one light.
 uniform float uMat;
+// 1 when the ground is clear: alpha is the surface's coverage (and its
+// shadow's darkness), so the canvas can sit above other content.
+uniform float uClear;
 uniform vec3 uLightDir;
 // Surface finish, shared by every material that has one: 0 is a mirror, 1 is
 // chalk. Anisotropy stretches the highlight along the grain — brushed metal
@@ -517,6 +530,7 @@ void main(){
 
   vec3 back = texture(uBg, uv).rgb;
   float grain = 1.;
+  float cover = 0.;
 
   // shadow: offset and strength follow the surface's elevation
   float msk = max(texture(uS, uv).r, 1e-3);
@@ -877,6 +891,16 @@ void main(){
 
     col = mix(col, plasma, a);
     grain = 1. - a;   // grain is background-only; panels stay clean
+    cover = a;
+  }
+  if (uClear > .5) {
+    // Outside a surface only its shadow lands on the page: black at the
+    // shadow's darkness. Inside, the surface itself. The edge blends the two
+    // by coverage, un-premultiplied for a non-premultiplied canvas.
+    float shade = clamp(shStr * smoothstep(.02, .55, hs) * (1. - uLight*.6), 0., 1.);
+    float alpha = max(cover, shade);
+    o = vec4(col * (cover / max(alpha, 1e-4)), alpha);
+    return;
   }
   // Keyed on viewport position, so a frame drawn for a taller region has the
   // same grain in its viewport band as the live frame that replaces it.

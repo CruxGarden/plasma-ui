@@ -1111,6 +1111,18 @@ function Api() {
                 "Blur the background itself, in px (0-40). Unlike frost, which blurs only what a frosted surface sees.",
               ],
               [
+                "preserveDrawingBuffer",
+                "boolean",
+                "false",
+                "Keep each frame after it is shown, so another provider can sample this canvas as its background. Fixed at creation.",
+              ],
+              [
+                "ground",
+                '"field" | "clear"',
+                '"field"',
+                "What shows where there is no surface. clear leaves the canvas transparent, so a second provider can sit above a scrim and draw only its surfaces, refracting the first provider's canvas passed as its background.",
+              ],
+              [
                 "pointerDrop",
                 "boolean",
                 "true",

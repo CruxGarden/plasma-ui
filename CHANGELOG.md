@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### A clear ground, so a second provider can sit above a scrim
+
+The material was one canvas behind everything, so anything drawn above a
+scrim - a dialog, a menu - could never be plasma. Two props make a second
+provider possible on top of the first.
+
+- **Added:** `ground` - `"field"` (the default, the old behaviour) paints the
+  background everywhere; `"clear"` leaves the canvas transparent outside the
+  surfaces, draws only the surfaces, their shadows and rims, and refracts the
+  `background` source sampled exactly (no swirl), so it lines up with what is
+  beneath. Alpha is the surface's coverage, the shadow's darkness outside it.
+- **Added:** `preserveDrawingBuffer` - keep each frame after it is shown so
+  another provider can pass this canvas as its `background`. Fixed at
+  creation; off by default.
+- The pair: the first provider with `preserveDrawingBuffer` and a
+  `<PlasmaCanvas className="ground" />`; the second, inside the dialog's own
+  stacking context, with `ground="clear"` and `background={groundCanvas}`,
+  its `<PlasmaCanvas>` between the scrim and the panel, and the panel
+  registered on it.
+
 ### Every look the material adds is now a control
 
 Six things gave the plasma a look of its own and only two could be turned off,

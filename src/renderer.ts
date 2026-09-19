@@ -34,6 +34,21 @@ export interface RendererSettings {
   grain: number;
   /** Blur applied to the background only, in CSS px (0-40). Costs 8 extra blur passes when above 0. */
   backgroundBlur: number;
+  /**
+   * What the canvas shows where there is no surface. "field" paints the
+   * background everywhere. "clear" leaves it transparent, so the canvas can
+   * sit above other content: only the surfaces, their shadows and rims are
+   * drawn, and what a surface refracts is the `background` source - usually a
+   * live canvas of the field beneath, sampled without swirl so it lines up.
+   */
+  ground: "field" | "clear";
+  /**
+   * Keep each frame in the drawing buffer after it is shown, so another
+   * provider can pass this canvas as its `background` and sample it. Off,
+   * the browser may clear the buffer after compositing and the sample reads
+   * blank. Fixed at creation.
+   */
+  preserveDrawingBuffer: boolean;
   /** What the surfaces are made of. */
   material: MaterialName;
   /** Direction the one light comes from. Every opaque material reads it, so they agree. */
@@ -143,7 +158,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -274,7 +289,9 @@ export class PlasmaRenderer {
 
   /** Returns null when WebGL2 is unavailable. */
   static create(canvas: HTMLCanvasElement, settings: RendererSettings): PlasmaRenderer | null {
-    const gl = canvas.getContext("webgl2", { antialias: false, premultipliedAlpha: false });
+    const gl = canvas.getContext("webgl2", {
+      antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: !!settings.preserveDrawingBuffer,
+    });
     if (!gl) return null;
     try { return new PlasmaRenderer(canvas, gl, settings); } catch (e) { console.error("[plasma-ui]", e); return null; }
   }
@@ -915,6 +932,7 @@ export class PlasmaRenderer {
     const bc = this.bgColor;
     gl.uniform3f(this.progs.bg.u.uBgColor, bc?.[0] ?? 0, bc?.[1] ?? 0, bc?.[2] ?? 0);
     gl.uniform1f(this.progs.bg.u.uBgSolid, bc ? 1 : 0);
+    gl.uniform1f(this.progs.bg.u.uClear, s.ground === "clear" ? 1 : 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.activeTexture(gl.TEXTURE0);
     gl.viewport(0, 0, this.rtA.w, this.rtA.h);
@@ -1012,6 +1030,7 @@ export class PlasmaRenderer {
     gl.uniform1f(c.u.uGlow, s.glow);
     gl.uniform1f(c.u.uWash, s.wash);
     gl.uniform1f(c.u.uGrain, s.grain);
+    gl.uniform1f(c.u.uClear, s.ground === "clear" ? 1 : 0);
     gl.uniform1f(c.u.uMat, Math.max(0, MATERIALS.indexOf(s.material)));
     gl.uniform3f(c.u.uLightDir, s.lightDir[0], s.lightDir[1], s.lightDir[2]);
     gl.uniform1f(c.u.uRough, s.roughness);
