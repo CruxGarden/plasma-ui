@@ -1069,7 +1069,7 @@ function Api() {
                 "highlightSharpness",
                 "number",
                 "0",
-                "How tight that highlight is: 0 the broad matte glow, 1 a small hard glint as on water. Plasma only.",
+                "How the highlight reflects in the edge: 0 the broad matte glow, 1 a compact reflection of a light above the pointer. Plasma only.",
               ],
               ["edgeLine", "number", "1", "Thin outline. 0 = off."],
               [

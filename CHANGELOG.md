@@ -5,9 +5,12 @@
 ### The highlight has a sharpness
 
 - **Added:** `highlightSharpness` (0-1, default 0). The pointer highlight on
-  the plasma material was one broad, matte glow; at 1 it is a small, hard
-  glint as on water, with the gain raised so a tight lobe stays visible. The
-  other materials light themselves from `roughness` and ignore it.
+  the plasma material was one broad, matte glow smeared across the bevel; at
+  1 it is the reflection of a light held above the pointer, Blinn-Phong on
+  the bevel's real normal, so it sits at one height in the edge as a compact
+  bright arc on the side nearest the light - a lamp in the rim of a glass.
+  Frost softens it. The other materials light themselves from `roughness`
+  and ignore it.
 
 ### A clear ground, so a second provider can sit above a scrim
 

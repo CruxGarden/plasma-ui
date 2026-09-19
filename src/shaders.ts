@@ -585,10 +585,7 @@ void main(){
     refr = mix(refr, tcol * mix(1., .92, uLight) + refr * .08 * (1. - talpha), talpha);
 
     vec2 L = normalize(uMouse - p + vec2(0., -200.));
-    // The exponent tightens the glint; the gain keeps a tight one visible,
-    // since a narrow lobe puts less light on any one pixel.
-    float ndl = max(dot(n, L), 0.);
-    float spec = pow(ndl, mix(26., 400., uSpecSharp)) * pow(bevel, mix(2., 1.2, uSpecSharp)) * slope * mix(1., 3.2, uSpecSharp);
+    float spec = pow(max(dot(n, L), 0.), 26.) * pow(bevel, 2.) * slope;
     float fres = pow(bevel, 5. / max(uRimWidth, .05)) * slope;
     // rim color: 0 iridescent, 1 solid color, 2 each surface's tint
     vec3 rimCol = pal(dot(n, L)*.35*slope + depth*.8 + uTime*.04 + uEnergy*.3);
@@ -608,7 +605,23 @@ void main(){
     if (uMat < .5) {
       // ── plasma ────────────────────────────────────────────────────────
       plasma += rimCol * fres * .45 * hl * uRim;
-      plasma += vec3(1.) * spec * .75 * hl * uSpec;
+      // The pointer highlight is a light reflected in the rounded edge. At 0
+      // it is the broad glow it always was: a 2D facing term smeared across
+      // the bevel. At 1 it is the reflection itself — Blinn-Phong on the
+      // bevel's real normal with the light held above the pointer, so the
+      // highlight is a compact bright arc on the edge nearest the light,
+      // sitting at the one height on the bevel whose normal bisects light
+      // and eye, the way a lamp sits in the rim of a glass.
+      float edgeSpec = spec;
+      if (uSpecSharp > .001) {
+        vec3 Lp = normalize(vec3(uMouse - p + vec2(0., -200.), 240.));
+        vec3 Hp = normalize(Lp + V);
+        float ndh = max(dot(Nb, Hp), 0.);
+        float core = pow(ndh, mix(80., 900., uSpecSharp)) * slope;
+        float body = pow(ndh, 24.) * slope * .22;
+        edgeSpec = mix(spec, (core * 4.5 + body) * (1. - .5 * fr), uSpecSharp);
+      }
+      plasma += vec3(1.) * edgeSpec * .75 * hl * uSpec;
       // faint shimmer across the body; fades out as the tint becomes opaque
       plasma += pal(uTime*.04 + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha) * uShim;
       vec3 hairCol = uRimMode > .5 ? mix(vec3(1.), rimCol / 1.4, .6) : vec3(.9,.95,1.);

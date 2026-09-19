@@ -22,7 +22,7 @@ export interface RendererSettings {
   rimWidth: number;
   /** Pointer-facing highlight strength. */
   highlight: number;
-  /** How tight that highlight is: 0 the broad matte glow, 1 a small hard glint as on water. Plasma material only. */
+  /** How the pointer highlight reflects in the edge: 0 the broad matte glow, 1 a compact reflection of a light held above the pointer, sitting in the bevel like a lamp in the rim of a glass. Plasma material only. */
   highlightSharpness: number;
   /** Thin edge line strength. */
   edgeLine: number;
