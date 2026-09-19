@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### The form-in is twice as quick
+
+- **Changed:** a surface forms in over about a quarter second instead of
+  half — the spring is four times stiffer with the damping raised to match,
+  so it still does not overshoot. A workspace of panes arriving together
+  read as slow at the old pace.
+
 ### A clear ground, so a second provider can sit above a scrim
 
 The material was one canvas behind everything, so anything drawn above a

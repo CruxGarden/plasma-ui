@@ -768,8 +768,11 @@ export class PlasmaRenderer {
       if (!s.reducedMotion) {
         // Critically damped: surfaces form in without overshooting. At the
         // old damping of 12 they went 17.6% past full size and rang back,
-        // which read as a bounce on first paint.
-        r.formV += (170 * (1 - r.form) - 26 * r.formV) * dt;
+        // which read as a bounce on first paint. Stiffness 680 / damping 52
+        // (the same ratio) settles in about a quarter second; the 170 / 26 it
+        // shipped with took half a second, which read as slow once a whole
+        // workspace of panes arrived at once.
+        r.formV += (680 * (1 - r.form) - 52 * r.formV) * dt;
         r.form += r.formV * dt;
       } else r.form = 1;
       if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); dispatch(r.el, FORMED_EVENT, r.id); }
