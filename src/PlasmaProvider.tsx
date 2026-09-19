@@ -22,7 +22,7 @@ export interface PlasmaProviderProps {
   rimWidth?: number;
   /** Strength of the highlight that faces the pointer. 0 turns it off. Default 1. */
   highlight?: number;
-  /** How the pointer highlight reflects in the edge, 0-1: 0 the broad, matte glow (the default); 1 a compact reflection of a light held above the pointer, sitting in the bevel like a lamp in the rim of a glass. Plasma material only. */
+  /** How the pointer highlight reflects in the edge, 0-1: 0 the broad, matte glow (the default); 1 a compact reflection of a light held above the pointer, on the rim itself, in the band the iridescence lives in, like a lamp in the lip of a glass. Plasma material only. */
   highlightSharpness?: number;
   /** Strength of the thin line along the outline. 0 turns it off. Default 1. */
   edgeLine?: number;

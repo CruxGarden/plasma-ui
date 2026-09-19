@@ -614,12 +614,14 @@ void main(){
       // and eye, the way a lamp sits in the rim of a glass.
       float edgeSpec = spec;
       if (uSpecSharp > .001) {
-        vec3 Lp = normalize(vec3(uMouse - p + vec2(0., -200.), 240.));
-        vec3 Hp = normalize(Lp + V);
-        float ndh = max(dot(Nb, Hp), 0.);
-        float core = pow(ndh, mix(80., 900., uSpecSharp)) * slope;
-        float body = pow(ndh, 24.) * slope * .22;
-        edgeSpec = mix(spec, (core * 4.5 + body) * (1. - .5 * fr), uSpecSharp);
+        // Where along the edge: the side facing the light, in a short arc.
+        // Where across it: exactly the rim — the same band the iridescence
+        // lives in (fres), so the reflection sits on the lip, not on the
+        // inner slope where a bisecting normal would put it and read as a
+        // second bump under the content.
+        float facing = pow(max(dot(n, L), 0.), mix(26., 220., uSpecSharp));
+        float core = facing * fres * mix(1., 7., uSpecSharp);
+        edgeSpec = mix(spec, core * (1. - .5 * fr), uSpecSharp);
       }
       plasma += vec3(1.) * edgeSpec * .75 * hl * uSpec;
       // faint shimmer across the body; fades out as the tint becomes opaque
