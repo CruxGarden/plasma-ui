@@ -207,7 +207,7 @@ void main(){
 const compFrag = `#version 300 es
 ${common}
 uniform sampler2D uH, uS, uTint, uBg, uBgM, uBgH, uFrost;
-uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair, uShim, uGlow, uWash, uGrain;
+uniform float uRefract, uDisp, uRim, uRimMode, uRimWidth, uSpec, uHair, uShim, uShimSp, uGlow, uWash, uGrain;
 // Which material the surfaces are made of, and the one light every opaque one
 // reads. Glass fakes its lighting off the pointer because you see through it;
 // the moment anything is opaque, two materials disagreeing about where the sun
@@ -606,7 +606,7 @@ void main(){
       plasma += rimCol * fres * .45 * hl * uRim;
       plasma += vec3(1.) * spec * .75 * hl * uSpec;
       // faint shimmer across the body; fades out as the tint becomes opaque
-      plasma += pal(uTime*.04 + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha) * uShim;
+      plasma += pal(uTime*.04*uShimSp + vp.y/900. + uEnergy*.3) * .05 * lift * (1.+uEnergy*2.) * hl * (1. - talpha) * uShim;
       vec3 hairCol = uRimMode > .5 ? mix(vec3(1.), rimCol / 1.4, .6) : vec3(.9,.95,1.);
       plasma += hairCol * (1.-smoothstep(0., 1.6, abs(sd - .7))) * .4 * hl * uHair;
     } else if (uMat < 1.5) {

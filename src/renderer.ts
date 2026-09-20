@@ -28,6 +28,8 @@ export interface RendererSettings {
   edgeLine: number;
   /** Slow iridescent sheen across the body of each surface. 0 = none. */
   shimmer: number;
+  /** How fast that sheen drifts. 1 is the slow default; 30 cycles the colours visibly — a button lighting up under the pointer. */
+  shimmerSpeed: number;
   /** Colored bloom the plasma casts onto the background around it. 0 = none. */
   glow: number;
   /** How much the material tints what is seen through it. 0 = clear as water. */
@@ -194,7 +196,7 @@ type Prog = { pr: WebGLProgram; u: Record<string, WebGLUniformLocation | null> }
 type Target = { tex: WebGLTexture; fb: WebGLFramebuffer; w: number; h: number };
 
 const UNIFORMS = ["uRes", "uView", "uScale", "uTime", "uGoo", "uEnergy", "uLight", "uMouseAmt", "uDropR", "uPull", "uAmbient", "uScroll",
-  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
+  "uMouse", "uP", "uR", "uF", "uT", "uFr", "uEl", "uSolo", "uTint", "uImg", "uImgRes", "uHasImg", "uBgColor", "uBgSolid", "uBg", "uBgM", "uBgH", "uFrost", "uOut", "uCount", "uRip", "uA", "uB", "uC", "uH", "uS", "uTex", "uDir", "uVisc", "uFlow", "uRefract", "uDisp", "uRim", "uRimMode", "uRimColor", "uRimWidth", "uSpec", "uHair", "uShim", "uShimSp", "uGlow", "uWash", "uGrain", "uClear", "uMat", "uLightDir", "uRough", "uAniso", "uEdge", "uEdgeScale", "uEdgeSharp", "uThick", "uTension"];
 const MASK_SCALE = 0.5;
 // Every pass is full-viewport, so cost scales with the canvas. Past this many
 // pixels the resolution drops rather than the frame rate: a 4K monitor or a
@@ -1098,6 +1100,7 @@ export class PlasmaRenderer {
     gl.uniform1f(c.u.uSpec, s.highlight);
     gl.uniform1f(c.u.uHair, s.edgeLine);
     gl.uniform1f(c.u.uShim, s.shimmer);
+    gl.uniform1f(c.u.uShimSp, s.shimmerSpeed);
     gl.uniform1f(c.u.uGlow, s.glow);
     gl.uniform1f(c.u.uWash, s.wash);
     gl.uniform1f(c.u.uGrain, s.grain);
