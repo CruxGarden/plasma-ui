@@ -1,0 +1,23 @@
+# Dependabot. Deliberately quiet: CI here runs a matrix that has exhausted the
+# month's Actions minutes before (2026-09-05), so updates arrive monthly,
+# grouped into one pull request per ecosystem, with a low open limit. Security
+# advisories ignore the limit and still arrive as soon as they are published.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    groups:
+      plasma-ui:
+        patterns: ["*"]
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ["*"]
