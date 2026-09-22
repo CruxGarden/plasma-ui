@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Added:** `shimmerSpeed` (default 1) controls how fast the iridescent sheen drifts, independently of its strength.
+
 ### The form-in is twice as quick, and yours to set
 
 - **Changed:** a surface forms in over about a quarter second instead of

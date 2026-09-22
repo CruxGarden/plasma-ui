@@ -1060,6 +1060,12 @@ function Api() {
                 "The slow iridescent sheen drifting across each surface. 0 = off.",
               ],
               [
+                "shimmerSpeed",
+                "number",
+                "1",
+                "How fast the iridescent sheen drifts. Raise it for faster motion; 0 holds it still.",
+              ],
+              [
                 "glow",
                 "number",
                 "1",
