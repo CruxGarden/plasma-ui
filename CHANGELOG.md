@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Fixed:** below about 31 fps (a large canvas on a busy GPU) the form-in
+  spring diverged: surfaces flashed page-sized every other frame, then
+  overflowed to NaN after about 40 seconds and never came back. The form
+  spring now substeps, so it settles the same at any frame rate.
 - **Added:** `shimmerSpeed` (default 1) controls how fast the iridescent sheen drifts, independently of its strength.
 
 ### The form-in is twice as quick, and yours to set
