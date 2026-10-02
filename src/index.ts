@@ -2,6 +2,16 @@ export { PlasmaProvider, PlasmaCanvas, usePlasma, usePlasmaRuntime, usePlasmaDef
 export type { PlasmaProviderProps, PlasmaCanvasProps, PlasmaContextValue, PlasmaRuntime, PlasmaDefaults } from "./PlasmaProvider";
 export { Plasma } from "./Plasma";
 export type { PlasmaProps, PlasmaOwnProps, Offset } from "./Plasma";
+export { PlasmaButton } from "./components/Button";
+export type { PlasmaButtonProps, PlasmaButtonOwnProps } from "./components/Button";
+export { PlasmaSwitch } from "./components/Switch";
+export type { PlasmaSwitchProps, PlasmaSwitchOwnProps } from "./components/Switch";
+export { PlasmaSlider } from "./components/Slider";
+export type { PlasmaSliderProps, PlasmaSliderOwnProps } from "./components/Slider";
+export { PlasmaTabs, PlasmaTabList, PlasmaTab, PlasmaTabPanel } from "./components/Tabs";
+export type { PlasmaTabsProps, PlasmaTabListProps, PlasmaTabProps, PlasmaTabOwnProps, PlasmaTabPanelProps } from "./components/Tabs";
+export { PlasmaAccordion, PlasmaAccordionItem } from "./components/Accordion";
+export type { PlasmaAccordionProps, PlasmaAccordionItemProps, PlasmaAccordionItemOwnProps } from "./components/Accordion";
 export { moods, resolveMood } from "./moods";
 export type { Mood, MoodName } from "./moods";
 export { snapBox, boxGap } from "./snap";

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Components
+
+- **Added:** five ready-made components on top of `<Plasma>`: `PlasmaButton`,
+  `PlasmaSwitch`, `PlasmaSlider`, `PlasmaTabs` (with `PlasmaTabList`,
+  `PlasmaTab`, `PlasmaTabPanel`) and `PlasmaAccordion` (with
+  `PlasmaAccordionItem`). Flush tabs and accordion items fuse into one surface.
+  They are controlled or uncontrolled, forward refs, keyboard-operable, and
+  fall back to CSS without WebGL2. Their styles ship inside the provider's
+  `<style>`, so server rendering has them from the first byte.
+
 - **Added:** `shimmerSpeed` (default 1) controls how fast the iridescent sheen drifts, independently of its strength.
 
 ### The form-in is twice as quick, and yours to set

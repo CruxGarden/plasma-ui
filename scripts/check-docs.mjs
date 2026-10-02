@@ -50,6 +50,41 @@ for (const iface of [
   }
 }
 
+// The components' own props only have to be in the README: their demos on the
+// site do not exercise every prop, and the README table is where they live.
+const COMPONENT_IFACES = [
+  "PlasmaButtonOwnProps",
+  "PlasmaSwitchOwnProps",
+  "PlasmaSliderOwnProps",
+  "PlasmaTabsProps",
+  "PlasmaTabOwnProps",
+  "PlasmaTabPanelProps",
+  "PlasmaAccordionProps",
+  "PlasmaAccordionItemOwnProps",
+];
+const componentDts = fs
+  .readdirSync(new URL("../dist/components/", import.meta.url))
+  .filter((f) => /^[A-Z].*\.d\.ts$/.test(f))
+  .map((f) => read(`dist/components/${f}`))
+  .join("\n");
+for (const iface of COMPONENT_IFACES) {
+  const m = componentDts.match(
+    new RegExp(`interface ${iface}\\b[^{]*\\{([\\s\\S]*?)\\n\\}`),
+  );
+  if (!m) {
+    fail.push(`interface ${iface} not found in dist/components/*.d.ts`);
+    continue;
+  }
+  // Own props only: the extends clause carries the DOM's, which are not ours to document.
+  for (const [, quoted, bare] of m[1].matchAll(
+    /^\s{4}(?:"([\w-]+)"|(\w+))\??:/gm,
+  )) {
+    const prop = quoted ?? bare;
+    if (prop !== "children" && !mentions(readme, prop))
+      fail.push(`${iface}.${prop} is public but not mentioned in README.md`);
+  }
+}
+
 // Playground defaults must be the library's, or the copied snippet lies.
 const libSrc = read("src/PlasmaProvider.tsx");
 const libDefaults = Object.fromEntries(

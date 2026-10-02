@@ -119,6 +119,47 @@ if you need to wrap `Plasma` in a component of your own.
 
 Drag ignores presses on buttons, links, inputs, and anything marked `data-plasma-nodrag`.
 
+## Components
+
+Five ready-made pieces built on `<Plasma>`. Each one is a plasma surface with ordinary HTML inside, accepts every `<Plasma>` prop (`radius`, `tint`, `opacity`, `frost`, `elevation`, ...) plus the attributes of the element it renders, and forwards a `ref` to it. Colors follow the page's text color; nothing picks a palette for you.
+
+```tsx
+import {
+  PlasmaButton, PlasmaSwitch, PlasmaSlider,
+  PlasmaTabs, PlasmaTabList, PlasmaTab, PlasmaTabPanel,
+  PlasmaAccordion, PlasmaAccordionItem,
+} from "@cruxgarden/plasma-ui";
+
+<PlasmaButton solid onClick={save}>Save</PlasmaButton>
+<PlasmaSwitch label="Wi-Fi" checked={on} onCheckedChange={setOn} />
+<PlasmaSlider aria-label="Volume" value={v} onValueChange={setV} />
+
+<PlasmaTabs defaultValue="a">
+  <PlasmaTabList aria-label="Sections">
+    <PlasmaTab value="a">One</PlasmaTab>
+    <PlasmaTab value="b">Two</PlasmaTab>
+  </PlasmaTabList>
+  <PlasmaTabPanel value="a">First</PlasmaTabPanel>
+  <PlasmaTabPanel value="b">Second</PlasmaTabPanel>
+</PlasmaTabs>
+
+<PlasmaAccordion defaultValue={["q1"]}>
+  <PlasmaAccordionItem value="q1" title="What is it?">Answer</PlasmaAccordionItem>
+  <PlasmaAccordionItem value="q2" title="Why?">Answer</PlasmaAccordionItem>
+</PlasmaAccordion>
+```
+
+| Component | Own props | Notes |
+| --------- | --------- | ----- |
+| `PlasmaButton` | `solid` (fill with the tint, default `false`), `size` (`"sm" \| "md" \| "lg"`, default `"md"`) | A pill. Sends a pulse from the pointer (or its center, for a keyboard press) on click; no pulse under reduced motion. Text color is picked to read on a solid tint. |
+| `PlasmaSwitch` | `checked`, `defaultChecked`, `onCheckedChange(checked)`, `label`, `checkedTint` | `role="switch"`. With `label`, the text wraps the switch in a `<label>`, so clicking it toggles and it names the switch. Without one, pass `aria-label`. |
+| `PlasmaSlider` | `value`, `defaultValue`, `onValueChange(value)`, `min`, `max`, `step`, `disabled`, `name` | A native `<input type="range">` under the visuals, so keyboard, touch, and forms are the browser's. `aria-label`, `aria-labelledby`, `aria-valuetext` and `id` go to the input. |
+| `PlasmaTabs` | `value`, `defaultValue`, `onValueChange(value)`, `orientation` | State only. `PlasmaTabList` lays tabs out flush so they fuse into one segmented surface; arrow keys, Home, and End move and select. `PlasmaTab` takes `value`; `PlasmaTabPanel` takes `value` and mounts its children only while selected. |
+| `PlasmaAccordion` | `type` (`"single" \| "multiple"`, default `"single"`), `value`, `defaultValue`, `onValueChange(values)` | Open items are an array of values in both modes. Items sit flush and fuse into one column; add a `gap` to its style to keep them apart. Up/Down/Home/End move between triggers. |
+| `PlasmaAccordionItem` | `value`, `title`, `disabled`, `headingLevel` (default `3`) | A surface holding a trigger and its content. |
+
+Each surface in a component counts toward `maxSurfaces`: a three-tab list is three, a three-item accordion is three. Like any surface, they fuse with whatever they touch, so keep other surfaces further apart than the blend distance - or flush, on purpose. Tabs and accordion items render as the CSS fallback when WebGL2 is unavailable, with squared inner corners so the segments still read as one piece.
+
 ## Hooks
 
 | Hook                  | Returns                                                                       |
