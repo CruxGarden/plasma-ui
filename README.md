@@ -4,9 +4,9 @@ Liquid components for React, rendered in WebGL on canvas, inspired by Apple's Li
 
 ![Five panels in a workspace: one is dragged out of its group and travels as liquid, another is dropped against a neighbour and fuses into it, and each snaps to the 24px grid](docs/demo.gif)
 
-[Playground and Docs](https://cruxgarden.github.io/plasma-ui/) · [Workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/)
+[Playground and Docs](https://cruxgarden.github.io/plasma-ui/) · [Workspace example](https://cruxgarden.github.io/plasma-ui/examples/workspace/) · [Changelog](https://cruxgarden.github.io/plasma-ui/#changelog)
 
-**Status: 0.3.0.** Core is stable and tested, but the API may change.
+**Status: pre-1.0.** Core is tested, but the API may change. See the [changelog](https://cruxgarden.github.io/plasma-ui/#changelog) for current features and upgrade notes.
 
 ```bash
 npm install @cruxgarden/plasma-ui
@@ -408,6 +408,11 @@ Plasma UI is built on well-known graphics and simulation techniques:
 [MIT](LICENSE)
 
 ## Release checks
+
+Add reader-facing feature highlights, fixes, upgrade notes, and contributor links
+to `site/releases.json` (newest first), and implementation details to
+`CHANGELOG.md`. The site's version label comes from the latest entry;
+`npm run verify` checks that it matches `package.json`.
 
 Run `npm ci`, `npx playwright install chromium`, `npm run verify`,
 `npm run test:browser`, and `npm run build:pages`. Open `site/dist/index.html`

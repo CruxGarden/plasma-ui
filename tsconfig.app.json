@@ -1,9 +1,15 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "resolveJsonModule": true,
     "noEmit": true,
     "declaration": false,
     "emitDeclarationOnly": false
   },
-  "include": ["src", "site/**/*.tsx", "examples/**/*.tsx", "tests/types/**/*.tsx"]
+  "include": [
+    "src",
+    "site/**/*.tsx",
+    "examples/**/*.tsx",
+    "tests/types/**/*.tsx"
+  ]
 }

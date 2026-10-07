@@ -95,6 +95,8 @@ Visual verification is screenshot-driven (headless Chromium works; use SwiftShad
 
 Docs discipline: README prop tables mirror `dist/*.d.ts`; playground defaults mirror library defaults. `npm run check:docs` (part of `verify`) enforces both - every public prop must be named in README.md and site/App.tsx, and any deliberate divergence in the playground defaults goes in its `INTENDED` map with the reason.
 
+Release notes: `site/releases.json` holds user-facing features, fixes, upgrade notes and contributor links, newest first. `site/Changelog.tsx` renders them and supplies the current version for the hero and footer. `check:docs` requires the newest entry to match `package.json`. Keep detailed implementation history in `CHANGELOG.md`; link to it for older releases.
+
 ## Known gaps -> roadmap (README has the user-facing version)
 
 layers (overlaps fuse; a dialog above a scrim is a second clear-ground provider today, true stacking in one canvas is not) -> drag handles + resize -> scroll clipping -> pluggable background -> shapes/rotation. CONTRIBUTING.md frames these as first projects.
