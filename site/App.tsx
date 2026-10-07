@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Changelog, latestVersion } from "./Changelog";
 import {
   PlasmaProvider,
   Plasma,
@@ -385,8 +386,9 @@ export function App() {
         <Components />
         <Api />
         <Limitations />
+        <Changelog />
         <footer className="footer">
-          Plasma UI 0.1 · MIT license · a{" "}
+          Plasma UI {latestVersion} · MIT license · a{" "}
           <a href="https://crux.garden">Crux Garden</a> project
         </footer>
       </main>
@@ -411,6 +413,7 @@ function Nav({
         <a href="#playground">Playground</a>
         <a href="#components">Components</a>
         <a href="#api">API</a>
+        <a href="#changelog">Changelog</a>
         <a href="examples/workspace/" target="_blank" rel="noreferrer">
           Example app
         </a>
@@ -475,6 +478,9 @@ function Hero() {
               Send a pulse
             </button>
           </div>
+          <p className="hero-note">
+            <a href="#changelog">What’s new in {latestVersion}</a>
+          </p>
           <p className="hero-note">
             For the best experience, use a desktop browser or app. The effect is
             GPU-heavy and does not run well on mobile.

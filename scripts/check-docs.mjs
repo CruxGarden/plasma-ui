@@ -12,6 +12,13 @@ import fs from "node:fs";
 const read = (p) =>
   fs.readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 const fail = [];
+const releases = JSON.parse(read("site/releases.json"));
+const { version } = JSON.parse(read("package.json"));
+if (releases[0]?.version !== version) {
+  fail.push(
+    `Add feature highlights for ${version} to site/releases.json before releasing.`,
+  );
+}
 
 if (!fs.existsSync(new URL("../dist/PlasmaProvider.d.ts", import.meta.url))) {
   console.error("check-docs: dist/ is missing - run `npm run build` first.");

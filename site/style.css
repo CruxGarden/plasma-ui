@@ -41,16 +41,16 @@ section { margin-top: 140px; }
 
 /* nav */
 .nav {
-  position: fixed; top: 16px; left: max(16px, calc(50% - 520px)); z-index: 10;
-  width: min(1040px, calc(100vw - 32px)); display: flex; align-items: center; gap: 20px; padding: 10px 20px 10px 22px;
+  position: fixed; top: 16px; left: max(16px, calc(50% - 560px)); z-index: 10;
+  width: min(1120px, calc(100vw - 32px)); display: flex; align-items: center; gap: 12px; padding: 10px 20px 10px 22px;
   border-radius: 30px;
 }
 .nav.plasma-fallback { background: linear-gradient(160deg, rgb(20 40 52 / .72), rgb(10 22 30 / .6)); }
 :root[data-theme="light"] .nav.plasma-fallback { background: linear-gradient(160deg, rgb(255 255 255 / .7), rgb(235 242 245 / .55)); }
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .nav.plasma-fallback { background: linear-gradient(160deg, rgb(255 255 255 / .7), rgb(235 242 245 / .55)); } }
 .brand { font-family: "Cormorant Garamond", Georgia, serif; font-weight: 600; font-size: 1.45rem; text-decoration: none; white-space: nowrap; }
-.nav-links { display: flex; gap: 18px; margin-right: auto; }
-.nav-links a { text-decoration: none; color: var(--muted); font-size: .95rem; }
+.nav-links { display: flex; gap: 12px; margin-right: auto; }
+.nav-links a { white-space: nowrap; text-decoration: none; color: var(--muted); font-size: .95rem; }
 .nav-links a:hover { color: var(--text); }
 /* Repo link: last in the bar, and the one nav item that survives narrow widths. */
 .repo { display: inline-flex; align-items: center; color: var(--muted); text-decoration: none; }
@@ -184,3 +184,22 @@ tr:last-child td { border-bottom: 0; }
 .demo-row { display: flex; align-items: center; flex-wrap: wrap; gap: 56px; margin-bottom: 1.6rem; }
 .demo-value { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 2ch; }
 .demo-row.tight { gap: 16px; }
+
+/* Release highlights stay readable without requiring another WebGL surface. */
+.releases { border-top: 1px solid var(--faint); }
+.release { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 32px; padding: 36px 0; border-bottom: 1px solid var(--faint); }
+.release-version { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-family: "JetBrains Mono", monospace; }
+.release-badge { color: var(--focus); font-size: .75rem; border: 1px solid var(--faint); border-radius: 999px; padding: 2px 10px; }
+.release h3 { font-size: 2rem; scroll-margin-top: 24px; }
+.release p, .release li { max-width: 70ch; color: var(--muted); }
+.release h4 { margin: 1.5rem 0 .5rem; font-size: 1rem; }
+.release ul { padding-left: 1.25rem; margin: 0; }
+.release li + li { margin-top: .5rem; }
+.release .release-links { display: flex; flex-wrap: wrap; gap: 12px 24px; list-style: none; padding: 0; margin-top: 1.5rem; font-size: .9rem; }
+.release-links li + li { margin-top: 0; }
+.release-links a { color: var(--text); }
+@media (max-width: 1100px) { .nav-links { display: none; } }
+@media (max-width: 560px) {
+  .release { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .release-version { flex-direction: row; align-items: center; }
+}

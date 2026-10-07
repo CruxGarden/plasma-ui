@@ -1,0 +1,68 @@
+[
+  {
+    "version": "0.8.0",
+    "title": "Controls you can build with",
+    "summary": "Build interactive interfaces with liquid buttons, switches, sliders, tabs, and accordions, alongside more reliable animation on slower devices.",
+    "groups": [
+      {
+        "title": "New features",
+        "items": [
+          "Five ready-to-use React controls: PlasmaButton, PlasmaSwitch, PlasmaSlider, PlasmaTabs, and PlasmaAccordion.",
+          "Live component examples and documented props to help you get started."
+        ]
+      },
+      {
+        "title": "Fixes and improvements",
+        "items": [
+          "Surfaces stay stable at low frame rates instead of flashing, growing too large, or disappearing.",
+          "Keyboard navigation, accessible IDs, nested accordions, and slider step alignment were refined during release review."
+        ]
+      },
+      {
+        "title": "Upgrading",
+        "items": [
+          "Existing exports remain available. The new controls are additive, support React 18 and 19, and add no runtime dependencies."
+        ]
+      }
+    ],
+    "links": [
+      { "label": "Try the new controls", "href": "#components" },
+      {
+        "label": "Controls by Crimson341 · PR #7",
+        "href": "https://github.com/CruxGarden/plasma-ui/pull/7"
+      },
+      {
+        "label": "Animation fix by aidanlachlan · PR #5",
+        "href": "https://github.com/CruxGarden/plasma-ui/pull/5"
+      }
+    ]
+  },
+  {
+    "version": "0.7.0",
+    "title": "More control over the material",
+    "summary": "Tune the look and movement of your surfaces, and compose them into more flexible layouts. These highlights cover the accumulated changes included in 0.7.0.",
+    "groups": [
+      {
+        "title": "New features",
+        "items": [
+          "Adjust shimmer, glow, color wash, grain, and background blur independently, including a clear-water look.",
+          "Control how surfaces appear and disappear with formIn, formOut, and formSpeed, and react when their entrance animation finishes.",
+          "Place the canvas yourself, use separate snapping groups, and layer another provider above a dialog scrim with a transparent background."
+        ]
+      },
+      {
+        "title": "Fixes and improvements",
+        "items": [
+          "Better recovery after graphics-context loss, restored background images, and more complete graphics-resource cleanup.",
+          "Cleaner server rendering and improved React integration, including React 19 ref types."
+        ]
+      }
+    ],
+    "links": [
+      {
+        "label": "Read the 0.7.0 details",
+        "href": "https://github.com/CruxGarden/plasma-ui/blob/main/CHANGELOG.md#070"
+      }
+    ]
+  }
+]
