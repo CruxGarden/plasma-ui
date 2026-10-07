@@ -178,3 +178,9 @@ tr:last-child td { border-bottom: 0; }
   .row { flex-wrap: wrap; }
   .stage { height: 720px; }
 }
+
+.demos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 72px 64px; margin-top: 2rem; }
+.demo h3 { font-size: .95rem; color: var(--muted); font-weight: 500; margin-bottom: 1.2rem; }
+.demo-row { display: flex; align-items: center; flex-wrap: wrap; gap: 56px; margin-bottom: 1.6rem; }
+.demo-value { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 2ch; }
+.demo-row.tight { gap: 16px; }

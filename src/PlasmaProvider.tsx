@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BackgroundSource, MaterialName, PlasmaRenderer, RendererSettings } from "./renderer";
 import { Mood, MoodName, resolveMood } from "./moods";
+import { COMPONENT_CSS } from "./components/styles";
 
 export interface PlasmaProviderProps {
   children?: React.ReactNode;
@@ -360,7 +361,7 @@ export function PlasmaProvider({
     <RuntimeContext.Provider value={runtime}>
       <DefaultsContext.Provider value={defaults}>
         <AttachContext.Provider value={setCanvasEl}>
-          <style>{FALLBACK_CSS}</style>
+          <style>{FALLBACK_CSS + COMPONENT_CSS}</style>
           {canvas && <PlasmaCanvas zIndex={zIndex} />}
           {children}
         </AttachContext.Provider>
