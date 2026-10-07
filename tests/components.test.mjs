@@ -53,8 +53,10 @@ test("inkOn picks a readable color and declines a non-hex tint", () => {
   assert.equal(inkOn("tomato"), undefined);
 });
 
-test("idPart strips whitespace so ids stay valid in aria lists", () => {
-  assert.equal(idPart("a b  c"), "a_b_c");
+test("idPart preserves distinct values without whitespace in aria IDs", () => {
+  const parts = ["a b", "a_b", "a  b", "a%20b", "😀"].map(idPart);
+  assert.equal(new Set(parts).size, parts.length);
+  assert.ok(parts.every(part => !/\s/.test(part)));
 });
 
 test("PlasmaButton renders a button surface and passes DOM props through", () => {

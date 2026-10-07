@@ -37,8 +37,14 @@ export const PlasmaSlider = forwardRef<HTMLDivElement, PlasmaSliderProps>(functi
   ref,
 ) {
   const [v, setV] = useControllable(value, defaultValue ?? min, onValueChange);
+  // Match native range sanitization so the painted thumb and input agree.
+  const upper = Math.max(min, max);
+  const increment = step > 0 && Number.isFinite(step) ? step : 1;
+  const clamped = Math.max(min, Math.min(upper, Number.isFinite(v) ? v : (min + upper) / 2));
+  const steps = Math.min(Math.round((clamped - min) / increment), Math.floor((upper - min) / increment + 1e-10));
+  const normalized = Number((min + steps * increment).toPrecision(15));
   const span = max - min;
-  const frac = span > 0 ? Math.min(Math.max((v - min) / span, 0), 1) : 0;
+  const frac = span > 0 ? Math.min(Math.max((normalized - min) / span, 0), 1) : 0;
 
   return (
     <Plasma
@@ -59,7 +65,7 @@ export const PlasmaSlider = forwardRef<HTMLDivElement, PlasmaSliderProps>(functi
         min={min}
         max={max}
         step={step}
-        value={v}
+        value={normalized}
         disabled={disabled}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}

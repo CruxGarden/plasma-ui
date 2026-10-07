@@ -235,3 +235,31 @@ test("a surface only snaps against its own group", () => {
     dom.restore();
   }
 });
+
+for (const formSpeed of [0.1, 1, 3, 10]) {
+  for (const interval of [8, 16, 33, 50]) {
+    test(`form springs stay bounded at speed ${formSpeed}, ${interval}ms frames`, () => {
+      const { dom, ctx, renderer } = mount({ formSpeed, formIn: true, formOut: true });
+      const el = { style: {}, isConnected: true, offsetWidth: 200, offsetHeight: 100,
+        getBoundingClientRect: () => ({ left: 10, top: 20, width: 200, height: 100 }) };
+      try {
+        const handle = renderer.register(el, { radius: 20, lean: 0 });
+        let last = 0;
+        const sample = () => {
+          dom.frames(1, interval);
+          const upload = ctx.calls.find(([fn, args]) => fn === "uniform1fv" && args[0]?.__kind === "uniform:uF");
+          assert.ok(upload, "form values must reach the shader");
+          last = upload[1][1][0];
+          assert.ok(Number.isFinite(last) && last >= 0 && last <= 1.001, `invalid form ${last}`);
+          ctx.clearCalls();
+        };
+        for (let i = 0; i < Math.ceil(6000 / interval); i++) sample();
+        assert.ok(last > 0.985, `form-in did not settle: ${last}`);
+        handle.remove();
+        for (let i = 0; i < Math.ceil(6000 / interval); i++) sample();
+        // A completed form-out releases the record, not just its layout entry.
+        assert.equal(renderer.recs.size, 0);
+      } finally { renderer.destroy(); dom.restore(); }
+    });
+  }
+}

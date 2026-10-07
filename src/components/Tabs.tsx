@@ -1,5 +1,6 @@
 import React, { createContext, forwardRef, useCallback, useContext, useId, useMemo, useRef } from "react";
 import { Plasma, PlasmaProps } from "../Plasma";
+import { useIsoLayoutEffect } from "../PlasmaProvider";
 import { cx, idPart, rovingIndex, useControllable } from "./shared";
 
 interface TabsContext {
@@ -7,6 +8,7 @@ interface TabsContext {
   select: (value: string) => void;
   orientation: "horizontal" | "vertical";
   base: string;
+  autoSelect: boolean;
 }
 const Ctx = createContext<TabsContext | null>(null);
 function useTabs(who: string): TabsContext {
@@ -34,7 +36,8 @@ export const PlasmaTabs = forwardRef<HTMLDivElement, PlasmaTabsProps>(function P
 ) {
   const [current, select] = useControllable(value, defaultValue ?? "", onValueChange);
   const base = useId();
-  const ctx = useMemo(() => ({ value: current, select, orientation, base }), [current, select, orientation, base]);
+  const autoSelect = value === undefined && defaultValue === undefined && current === "";
+  const ctx = useMemo(() => ({ value: current, select, orientation, base, autoSelect }), [current, select, orientation, base, autoSelect]);
   return (
     <Ctx.Provider value={ctx}>
       <div ref={ref} className={cx("plasma-tabs", className)} data-orientation={orientation} {...rest} />
@@ -49,17 +52,29 @@ export const PlasmaTabList = forwardRef<HTMLDivElement, PlasmaTabListProps>(func
   { className, onKeyDown, ...rest },
   ref,
 ) {
-  const { orientation } = useTabs("PlasmaTabList");
+  const { orientation, value, select, autoSelect } = useTabs("PlasmaTabList");
   const list = useRef<HTMLDivElement | null>(null);
   const setRef = useCallback((n: HTMLDivElement | null) => {
     list.current = n;
     if (typeof ref === "function") ref(n); else if (ref) ref.current = n;
   }, [ref]);
 
+  // Keep a keyboard entry even when no initial value was supplied or the
+  // selected tab has been disabled/removed. Scope queries to this list.
+  useIsoLayoutEffect(() => {
+    const tabs = Array.from(list.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [])
+      .filter(tab => tab.closest('[role="tablist"]') === list.current);
+    const entry = tabs.find(tab => !tab.disabled && tab.getAttribute('aria-selected') === 'true')
+      ?? tabs.find(tab => !tab.disabled);
+    tabs.forEach(tab => { tab.tabIndex = tab === entry ? 0 : -1; });
+    if (autoSelect && entry && entry.dataset.plasmaTabValue !== value) select(entry.dataset.plasmaTabValue!);
+  });
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(e);
     if (e.defaultPrevented) return;
-    const tabs = Array.from(list.current?.querySelectorAll<HTMLElement>('[role="tab"]:not(:disabled)') ?? []);
+    const tabs = Array.from(list.current?.querySelectorAll<HTMLElement>('[role="tab"]:not(:disabled)') ?? [])
+      .filter(tab => tab.closest('[role="tablist"]') === list.current);
     const to = rovingIndex(e.key, tabs.indexOf(e.target as HTMLElement), tabs.length, orientation);
     if (to < 0 || tabs.indexOf(e.target as HTMLElement) < 0) return;
     e.preventDefault();
@@ -99,6 +114,7 @@ export const PlasmaTab = forwardRef<HTMLButtonElement, PlasmaTabProps>(function 
       ref={ref as React.Ref<HTMLElement>}
       type="button"
       role="tab"
+      data-plasma-tab-value={value}
       id={`${t.base}-tab-${part}`}
       aria-selected={selected}
       aria-controls={`${t.base}-panel-${part}`}

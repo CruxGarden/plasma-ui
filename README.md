@@ -1,6 +1,6 @@
 # Plasma UI
 
-Liquid panels for React, rendered in WebGL on canvas, inspired by Apple's Liquid Glass design. The `<Plasma>` panel looks and behaves like liquid, with surface tension that fuses on contact with other panels. Anything visible behind the panel is refracted. And for layout convenience, the panels ultimately snap to a grid layout. The library is a work in progress, extracted from the [Crux Garden](https://github.com/cruxgarden) project, but it seemed useful enough to share in its current form.
+Liquid components for React, rendered in WebGL on canvas, inspired by Apple's Liquid Glass design. The `<Plasma>` panel looks and behaves like liquid, with surface tension that fuses on contact with other panels. Anything visible behind the panel is refracted. And for layout convenience, the panels ultimately snap to a grid layout. The library is a work in progress, extracted from the [Crux Garden](https://github.com/cruxgarden) project, but it seemed useful enough to share in its current form.
 
 ![Five panels in a workspace: one is dragged out of its group and travels as liquid, another is dropped against a neighbour and fuses into it, and each snaps to the 24px grid](docs/demo.gif)
 
@@ -154,7 +154,7 @@ import {
 | `PlasmaButton` | `solid` (fill with the tint, default `false`), `size` (`"sm" \| "md" \| "lg"`, default `"md"`) | A pill. Sends a pulse from the pointer (or its center, for a keyboard press) on click; no pulse under reduced motion. Text color is picked to read on a solid tint. |
 | `PlasmaSwitch` | `checked`, `defaultChecked`, `onCheckedChange(checked)`, `label`, `checkedTint` | `role="switch"`. With `label`, the text wraps the switch in a `<label>`, so clicking it toggles and it names the switch. Without one, pass `aria-label`. |
 | `PlasmaSlider` | `value`, `defaultValue`, `onValueChange(value)`, `min`, `max`, `step`, `disabled`, `name` | A native `<input type="range">` under the visuals, so keyboard, touch, and forms are the browser's. `aria-label`, `aria-labelledby`, `aria-valuetext` and `id` go to the input. |
-| `PlasmaTabs` | `value`, `defaultValue`, `onValueChange(value)`, `orientation` | State only. `PlasmaTabList` lays tabs out flush so they fuse into one segmented surface; arrow keys, Home, and End move and select. `PlasmaTab` takes `value`; `PlasmaTabPanel` takes `value` and mounts its children only while selected. |
+| `PlasmaTabs` | `value`, `defaultValue`, `onValueChange(value)`, `orientation` | When neither `value` nor `defaultValue` is supplied, the first enabled tab is selected after mounting. `PlasmaTabList` lays tabs out flush so they fuse into one segmented surface; arrow keys, Home, and End move and select. `PlasmaTab` takes `value`; `PlasmaTabPanel` takes `value` and mounts its children only while selected. |
 | `PlasmaAccordion` | `type` (`"single" \| "multiple"`, default `"single"`), `value`, `defaultValue`, `onValueChange(values)` | Open items are an array of values in both modes. Items sit flush and fuse into one column; add a `gap` to its style to keep them apart. Up/Down/Home/End move between triggers. |
 | `PlasmaAccordionItem` | `value`, `title`, `disabled`, `headingLevel` (default `3`) | A surface holding a trigger and its content. |
 
@@ -406,3 +406,14 @@ Plasma UI is built on well-known graphics and simulation techniques:
 ## License
 
 [MIT](LICENSE)
+
+## Release checks
+
+Run `npm ci`, `npx playwright install chromium`, `npm run verify`,
+`npm run test:browser`, and `npm run build:pages`. Open `site/dist/index.html`
+for the playground and live Components examples. CI also checks React 19 types.
+
+For a release branch whose package version is already bumped, merge first,
+then run `npm publish` from the verified main commit and tag that commit
+`v<version>`. Do not run `publish:minor` again: it would increment the prepared
+version a second time. `npm pack --dry-run` previews the published files.

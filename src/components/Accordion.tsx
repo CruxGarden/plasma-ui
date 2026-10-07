@@ -46,7 +46,8 @@ export const PlasmaAccordion = forwardRef<HTMLDivElement, PlasmaAccordionProps>(
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     onKeyDown?.(e);
     if (e.defaultPrevented) return;
-    const heads = Array.from(root.current?.querySelectorAll<HTMLElement>(".plasma-accordion-trigger:not(:disabled)") ?? []);
+    const heads = Array.from(root.current?.querySelectorAll<HTMLElement>(".plasma-accordion-trigger:not(:disabled)") ?? [])
+      .filter(head => head.closest('.plasma-accordion') === root.current);
     const from = heads.indexOf(e.target as HTMLElement);
     const to = from < 0 ? -1 : rovingIndex(e.key, from, heads.length, "vertical");
     if (to < 0) return;
@@ -85,6 +86,11 @@ export const PlasmaAccordionItem = forwardRef<HTMLDivElement, PlasmaAccordionIte
   const triggerId = `${ctx.base}-trigger-${part}`;
   const bodyId = `${ctx.base}-body-${part}`;
   const state = open ? "open" : "closed";
+  // The closing animation keeps pixels visible briefly; its content must stop
+  // accepting focus immediately. Set the DOM property for React 18/19 parity.
+  const bodyRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) node.inert = !open;
+  }, [open]);
 
   return (
     <Plasma
@@ -111,7 +117,7 @@ export const PlasmaAccordionItem = forwardRef<HTMLDivElement, PlasmaAccordionIte
           <span className="plasma-accordion-chevron" aria-hidden="true" />
         </button>,
       )}
-      <div id={bodyId} role="region" aria-labelledby={triggerId} className="plasma-accordion-body" data-state={state}>
+      <div ref={bodyRef} id={bodyId} role="region" aria-labelledby={triggerId} aria-hidden={!open} className="plasma-accordion-body" data-state={state}>
         <div className="plasma-accordion-inner">
           <div className="plasma-accordion-content">{children}</div>
         </div>

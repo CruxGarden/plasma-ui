@@ -183,10 +183,10 @@ export function installDOM({ coarsePointer = false } = {}) {
 
   return {
     images,
-    /** Run n virtual frames of 16ms. */
-    frames(n = 1) {
+    /** Run n virtual frames; vary the interval to exercise slow displays. */
+    frames(n = 1, interval = 16) {
       for (let i = 0; i < n; i++) {
-        raf.clock += 16;
+        raf.clock += interval;
         const q = raf.queue;
         raf.queue = [];
         q.forEach((fn) => fn && fn(raf.clock));

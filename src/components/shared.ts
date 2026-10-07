@@ -35,6 +35,6 @@ export function inkOn(hex: string, a = 1): string | undefined {
 }
 
 /** An id fragment safe in `aria-controls` / `aria-labelledby`, which split on whitespace. */
-export const idPart = (v: string) => v.replace(/\s+/g, "_");
+export const idPart = (v: string) => Array.from(v, c => c.codePointAt(0)!.toString(16)).join("-");
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");

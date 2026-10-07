@@ -1,7 +1,7 @@
 {
   "name": "@cruxgarden/plasma-ui",
-  "version": "0.7.0",
-  "description": "Liquid panels for React, rendered in WebGL on canvas: every panel is one shared plasma - they fuse on contact, refract, and snap to a grid.",
+  "version": "0.8.0",
+  "description": "Liquid components for React, rendered in WebGL on canvas: every panel is one shared plasma - they fuse on contact, refract, and snap to a grid.",
   "main": "dist/index.js",
   "scripts": {
     "build": "esbuild src/index.ts --bundle --format=esm --jsx=automatic --target=es2020 --external:react --external:react-dom --outfile=dist/index.js && tsc",
@@ -19,11 +19,13 @@
     "publish:minor": "npm version minor && npm publish && git push && git push --tags",
     "publish:major": "npm version major && npm publish && git push && git push --tags",
     "build:example": "node examples/workspace/build.mjs",
-    "build:pages": "node scripts/build-pages.mjs"
+    "build:pages": "node scripts/build-pages.mjs",
+    "test:browser": "playwright test"
   },
   "author": "The Keeper",
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "esbuild": "^0.28.2",

@@ -4,3 +4,6 @@ site/dist/
 *.tgz
 .DS_Store
 tests/.tmp/
+tests/.tmp-components/
+tests/.browser-results/
+playwright-report/
