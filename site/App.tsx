@@ -6,6 +6,15 @@ import {
   moods,
   MoodName,
   Offset,
+  PlasmaButton,
+  PlasmaSwitch,
+  PlasmaSlider,
+  PlasmaTabs,
+  PlasmaTabList,
+  PlasmaTab,
+  PlasmaTabPanel,
+  PlasmaAccordion,
+  PlasmaAccordionItem,
 } from "../src";
 
 type Theme = "auto" | "light" | "dark";
@@ -373,6 +382,7 @@ export function App() {
             setConfig("Lumen");
           }}
         />
+        <Components />
         <Api />
         <Limitations />
         <footer className="footer">
@@ -399,6 +409,7 @@ function Nav({
       </a>
       <div className="nav-links">
         <a href="#playground">Playground</a>
+        <a href="#components">Components</a>
         <a href="#api">API</a>
         <a href="examples/workspace/" target="_blank" rel="noreferrer">
           Example app
@@ -449,9 +460,9 @@ function Hero() {
         <Plasma className="hero-title" radius={36}>
           <h1>Plasma UI</h1>
           <p className="lede">
-            Liquid panels for React, rendered in WebGL on canvas. Every panel is
-            one shared plasma: they fuse on contact, refract what's behind them,
-            and snap to a grid.
+            Liquid components for React, rendered in WebGL on canvas. Every
+            panel is one shared plasma: they fuse on contact, refract what's
+            behind them, and snap to a grid.
           </p>
           <div className="row">
             <a className="btn primary" href="#playground">
@@ -963,6 +974,90 @@ function Playground({
           </pre>
         </div>
       </Plasma>
+    </section>
+  );
+}
+
+function Components() {
+  const [volume, setVolume] = useState(40);
+  const [wifi, setWifi] = useState(true);
+  return (
+    <section id="components">
+      <h2>Components</h2>
+      <p className="section-lede">
+        Five ready-made pieces, each one a plasma surface with ordinary HTML
+        inside. Flush neighbors fuse: the tabs below are one pill, the accordion
+        one column.
+      </p>
+      <div className="demos">
+        <div className="demo">
+          <h3>PlasmaButton</h3>
+          <div className="demo-row">
+            <PlasmaButton>Glass</PlasmaButton>
+            <PlasmaButton solid>Solid</PlasmaButton>
+            <PlasmaButton size="sm" disabled>
+              Disabled
+            </PlasmaButton>
+          </div>
+        </div>
+        <div className="demo">
+          <h3>PlasmaSwitch and PlasmaSlider</h3>
+          <div className="demo-row">
+            <PlasmaSwitch
+              checked={wifi}
+              onCheckedChange={setWifi}
+              label={wifi ? "Wi-Fi on" : "Wi-Fi off"}
+            />
+          </div>
+          <div className="demo-row tight">
+            <PlasmaSlider
+              value={volume}
+              onValueChange={setVolume}
+              aria-label="Volume"
+              style={{ width: 240 }}
+            />
+            <span className="demo-value">{volume}</span>
+          </div>
+        </div>
+        <div className="demo">
+          <h3>PlasmaTabs</h3>
+          <PlasmaTabs defaultValue="design">
+            <PlasmaTabList aria-label="Project sections">
+              <PlasmaTab value="design">Design</PlasmaTab>
+              <PlasmaTab value="build">Build</PlasmaTab>
+              <PlasmaTab value="ship">Ship</PlasmaTab>
+            </PlasmaTabList>
+            <PlasmaTabPanel value="design">
+              Sketch it flat; the plasma does the rest.
+            </PlasmaTabPanel>
+            <PlasmaTabPanel value="build">
+              Surfaces register themselves as they mount.
+            </PlasmaTabPanel>
+            <PlasmaTabPanel value="ship">
+              Arrow keys move between tabs.
+            </PlasmaTabPanel>
+          </PlasmaTabs>
+        </div>
+        <div className="demo">
+          <h3>PlasmaAccordion</h3>
+          <PlasmaAccordion defaultValue={["what"]}>
+            <PlasmaAccordionItem value="what" title="What is it?">
+              One shared plasma on a single WebGL2 canvas behind the DOM.
+            </PlasmaAccordionItem>
+            <PlasmaAccordionItem value="fuse" title="Why do items fuse?">
+              Surfaces that touch blend into one; flush edges stay straight.
+            </PlasmaAccordionItem>
+            <PlasmaAccordionItem value="a11y" title="Is it accessible?">
+              The content is ordinary HTML; the canvas only draws.
+            </PlasmaAccordionItem>
+          </PlasmaAccordion>
+        </div>
+      </div>
+      <p className="note">
+        Each part of a component that is a surface counts toward maxSurfaces: a
+        three-tab list is three, a three-item accordion is three. Keep other
+        surfaces further apart than the blend distance, or flush on purpose.
+      </p>
     </section>
   );
 }

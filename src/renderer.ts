@@ -793,12 +793,19 @@ export class PlasmaRenderer {
     const list: Rec[] = [];
     const sp = Math.max(0.1, Math.min(10, s.formSpeed || 1));
     const k = 680 * sp * sp, c = 52 * sp; // the same critical damping at every speed
+    // One step per frame diverges once dt passes ~32ms at speed 1 (~20ms for
+    // the stiffer form-out): below ~31fps form grew ~3x a frame with the sign
+    // flipping, so surfaces flashed page-sized, then overflowed to NaN and were
+    // gone for good. Substep so each step stays well inside the stable range.
+    const fSteps = Math.max(1, Math.ceil(dt * sp / 0.016)), fh = dt / fSteps;
     this.recs.forEach(r => {
       if (r.removing) {
         // Forming out: the spring runs to zero from the box it last had, at
         // 1.6× the form-in's pace — leaving reads right quicker than arriving.
-        r.formV += (k * 2.56 * (0 - r.form) - c * 1.6 * r.formV) * dt;
-        r.form += r.formV * dt;
+        for (let i = 0; i < fSteps; i++) {
+          r.formV += (k * 2.56 * (0 - r.form) - c * 1.6 * r.formV) * fh;
+          r.form += r.formV * fh;
+        }
         if (r.form < 0.02) { this.recs.delete(r.id); return; }
         r.box = r.removeBox;
         list.push(r);
@@ -812,8 +819,10 @@ export class PlasmaRenderer {
         // (the same ratio) settles in about a quarter second; the 170 / 26 it
         // shipped with took half a second, which read as slow once a whole
         // workspace of panes arrived at once.
-        r.formV += (k * (1 - r.form) - c * r.formV) * dt;
-        r.form += r.formV * dt;
+        for (let i = 0; i < fSteps; i++) {
+          r.formV += (k * (1 - r.form) - c * r.formV) * fh;
+          r.form += r.formV * fh;
+        }
       } else r.form = 1;
       if (r.forming && r.form > 0.985) { r.forming = false; r.el.removeAttribute(FORMING_ATTR); dispatch(r.el, FORMED_EVENT, r.id); }
       const b = elementBox(r.el);

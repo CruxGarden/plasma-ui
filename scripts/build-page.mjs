@@ -98,9 +98,9 @@ export const PAGES = [
   {
     entry: "site/main.tsx",
     css: "site/style.css",
-    title: "Plasma UI — liquid panels for React",
+    title: "Plasma UI — liquid components for React",
     description:
-      "Liquid panels for React, rendered in WebGL on canvas. Every panel is one shared plasma: they fuse on contact, refract what's behind them, and snap to a grid.",
+      "Liquid components for React, rendered in WebGL on canvas. Every panel is one shared plasma: they fuse on contact, refract what's behind them, and snap to a grid.",
     path: "index.html",
   },
   {

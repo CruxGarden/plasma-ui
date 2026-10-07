@@ -84,7 +84,8 @@ docs/demo.gif         README capture.
 npm install
 npm run build        # dist/ (esbuild ESM + tsc declarations)
 npm run build:site   # site/dist/index.html - THE integration test; open and click all 5 tabs
-npm test             # 29 tests (snap, spring, renderer lifecycle, SSR)
+npm test             # 57 tests (snap, spring, renderer lifecycle, SSR, components)
+npm run test:browser # Chromium: keyboard, controlled inputs, nested groups, CSS fallback
 npm run typecheck    # the library
 npm run typecheck:app  # + site, examples and the compile-only API suite
 npm run format:check # site/examples/scripts only - src, tests and CSS are deliberately dense
@@ -103,4 +104,4 @@ layers (overlaps fuse; a dialog above a scrim is a second clear-ground provider 
 1. GitHub: create `cruxgarden/plasma-ui`, push `main` + tags (repo is committed and tagged v0.1.0).
 2. npm: create `cruxgarden` org, `npm publish --access public` (prepublishOnly runs typecheck+test+build).
 3. Docs page: `npm run build:site` output is a single self-contained html - host anywhere (GitHub Pages: commit `site/dist` or an action).
-4. Announce with the workspace framing ("liquid panels for React"), the GIF, and the Not yet section up front.
+4. Announce with the workspace framing ("liquid components for React"), the GIF, and the Not yet section up front.

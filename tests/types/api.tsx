@@ -7,7 +7,8 @@
 import React, { useRef } from "react";
 import {
   Plasma, PlasmaProvider, PlasmaCanvas, usePlasma, usePlasmaRuntime, usePlasmaDefaults,
-  type PlasmaProps, type Offset,
+  PlasmaButton, PlasmaSwitch, PlasmaSlider, PlasmaTabs, PlasmaTabList, PlasmaTab, PlasmaTabPanel, PlasmaAccordion, PlasmaAccordionItem,
+  type PlasmaProps, type Offset, type PlasmaButtonProps,
 } from "../../src";
 
 const Link = (p: { to: string; children?: React.ReactNode; className?: string; style?: React.CSSProperties }) => <a href={p.to}>{p.children}</a>;
@@ -65,4 +66,27 @@ export function Hooks() {
   runtime.bump(0.5);
   all.pulse(0, 0);
   return <span>{defaults.radius + all.radius + (runtime.supported ? 1 : 0)}</span>;
+}
+
+/** The components: Plasma's own props flow through, and each element's attributes still typecheck. */
+export function Components() {
+  const btn = useRef<HTMLButtonElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const buttonProps: PlasmaButtonProps = { solid: true, size: "sm", tint: "#fff", radius: 12, onClick: e => e.currentTarget.blur(), form: "f" };
+  return (
+    <PlasmaProvider>
+      <PlasmaButton ref={btn} {...buttonProps} formAction="/x">go</PlasmaButton>
+      <PlasmaSwitch checked onCheckedChange={(c: boolean) => c} label="Wi-Fi" checkedTint="#0f0" name="wifi" />
+      <PlasmaSlider ref={box} value={3} onValueChange={(n: number) => n} min={0} max={10} step={0.5} aria-label="Volume" className="s" />
+      <PlasmaTabs defaultValue="a" onValueChange={(v: string) => v} orientation="vertical">
+        <PlasmaTabList aria-label="t">
+          <PlasmaTab value="a" disabled opacity={0.4}>A</PlasmaTab>
+        </PlasmaTabList>
+        <PlasmaTabPanel value="a" className="p">a</PlasmaTabPanel>
+      </PlasmaTabs>
+      <PlasmaAccordion type="multiple" value={["a"]} onValueChange={(v: string[]) => v.length}>
+        <PlasmaAccordionItem value="a" title={<b>A</b>} headingLevel={4} elevation={0.2} onJoinChange={() => {}}>a</PlasmaAccordionItem>
+      </PlasmaAccordion>
+    </PlasmaProvider>
+  );
 }

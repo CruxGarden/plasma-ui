@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+- **Added:** `PlasmaButton`, `PlasmaSwitch`, `PlasmaSlider`, `PlasmaTabs`
+  (with List, Tab and Panel), and `PlasmaAccordion` (with Item), with live
+  examples in the documentation site's Components section and documented props.
+- **Fixed:** the form-in/out spring remains stable on slow displays and at
+  every supported animation speed; surfaces no longer flash and disappear.
+- **Fixed during release review:** default tab keyboard entry, unique accessible
+  IDs, nested accordion navigation, immediate keyboard exclusion of closing
+  content, and slider visuals that match native step rounding.
+- **Changed:** the library is described as “Liquid components for React.”
+- **Compatibility:** existing exports remain; the controls are additive. React
+  18 and 19 remain supported, with no new runtime dependencies.
+- **Contributors:** [Crimson341](https://github.com/CruxGarden/plasma-ui/pull/7)
+  contributed the controls; [aidanlachlan](https://github.com/CruxGarden/plasma-ui/pull/5)
+  contributed the low-frame-rate spring fix. Original commits are retained.
+
+## 0.7.0
+
+The following accumulated changes were already included in 0.7.0.
 
 - **Added:** `shimmerSpeed` (default 1) controls how fast the iridescent sheen drifts, independently of its strength.
 
